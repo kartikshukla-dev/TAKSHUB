@@ -1,0 +1,60 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "HIGH",
+      "area": "aging-visual-encoding",
+      "title": "Aging-offset vs. card-gap arithmetic is wrong, and the gap value is contradicted between sections",
+      "location": "Ambiguous Decision 1 (translateY-offset-vs-gap paragraph) vs. Per-Screen Restyle Plan (board gap: var(--space-md))",
+      "problem": "A 12px translateY on a card painted over an 8px live gap overlaps the next card by 4px, not '4px into blank gap space, never touching' as claimed. Separately, Decision 1 asserts the gap is '8px, unaffected by this restyle' while the Per-Screen Restyle Plan commits the same gap to var(--space-md) = 12px, a direct contradiction.",
+      "fix": "Pick one final gap value and reference it from a single place; recompute the max offset so it is <= (gap - safety margin) and rescale the stage table, or explicitly state the intended overlap is cosmetic/safe for @dnd-kit hit-testing instead of asserting no overlap."
+    },
+    {
+      "id": 2,
+      "severity": "HIGH",
+      "area": "drop-to-done-animation-wiring",
+      "title": "TaskModal path's 'no race' justification is based on an incorrect model and relies on an unstated closure-timing accident",
+      "location": "Wiring section, paragraph justifying tasks.find(...) over openTask.status for handleTaskUpdated",
+      "problem": "taskController.updateTask emits the task:updated socket event (to a room that includes the sender) before sending the HTTP response, so a self-echo can beat patch()'s REST promise. The design claims 'tasks reflects the latest known status by the time patch() resolves', which if true would make shouldPlayDropAnimation('done','done') return false, breaking the animation. The code only avoids this today because of React closure-pinning behavior the design never identifies or protects, making it fragile to routine refactors (e.g. useCallback + ref-based latest-tasks pattern).",
+      "fix": "Capture prevStatus synchronously in TaskModal.patch() before the API call (const prevStatus = task.status) and pass it explicitly to onUpdated/handleTaskUpdated instead of re-deriving it from the tasks array, mirroring the already-safe synchronous-capture pattern used in handleDragEnd."
+    },
+    {
+      "id": 3,
+      "severity": "MEDIUM",
+      "area": "aging-visual-encoding",
+      "title": "Contradiction: data-aging is 'fresh' in one snippet and undefined in another for done tasks",
+      "location": "Mechanism paragraph (const stage = ... : 'fresh') vs. pinned TaskCard.jsx code block (data-aging={... : undefined})",
+      "problem": "Two snippets in the same document compute different values for the same case (a done task). Harmless under current CSS rules but an unreconciled contradiction.",
+      "fix": "Use undefined consistently (omit the attribute for done tasks) and update the prose snippet to match the pinned code block."
+    },
+    {
+      "id": 4,
+      "severity": "MEDIUM",
+      "area": "design-tokens",
+      "title": "Priority-dot 'now reading from --priority-* tokens' has no pinned implementation",
+      "location": "Per-Screen Restyle Plan, ProjectBoard/Column/TaskCard bullet",
+      "problem": "TaskCard.jsx currently sets the dot color via an inline style reading a plain JS hex map (PRIORITY_COLORS); the design asserts this becomes token-driven but never specifies whether PRIORITY_COLORS's values change to var(...) strings or the dot switches to a data-priority attribute + CSS rule.",
+      "fix": "Pin one approach explicitly, e.g. change PRIORITY_COLORS values to 'var(--priority-low)' etc. and keep the inline style binding."
+    },
+    {
+      "id": 5,
+      "severity": "NIT",
+      "area": "label-chips",
+      "title": "Label-chip accent alternation rule is not concrete",
+      "location": "Per-Screen Restyle Plan, board bullet ('alternated by index')",
+      "problem": "No concrete rule (e.g. modulo-2) is given for which labels get which accent variant.",
+      "fix": "Pin the rule, e.g. i % 2 === 0 ? indigo-variant : violet-variant."
+    },
+    {
+      "id": 6,
+      "severity": "NIT",
+      "area": "aging-visual-encoding",
+      "title": "Aging-badge JSX left as a comment placeholder; stage would be computed twice",
+      "location": "Pinned TaskCard.jsx code block",
+      "problem": "The badge markup is not shown despite its text content being pinned in prose, and no shared stage variable is pinned for reuse between the data-aging attribute and the badge condition.",
+      "fix": "Show the actual conditional badge JSX and compute stage once, reusing it for both the attribute and the badge."
+    }
+  ],
+  "reviewDoc": "c:/Users/karti/OneDrive/Desktop/TASKHUB/.agents/tasks/design-review.md"
+}

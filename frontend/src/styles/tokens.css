@@ -1,0 +1,65 @@
+:root {
+  /* Color */
+  --color-primary: #4338ca;
+  --color-primary-hover: #3730a3;
+  --color-primary-active: #312e81;
+  --color-secondary: #7c3aed;
+  --color-text: #1e1e2e;
+  --color-muted: #6b7280;
+  --color-border: #e5e7eb;
+  --color-border-hover: #d1d5db;
+  --color-canvas: #fafafa;
+  --color-surface: #ffffff;
+  --color-danger: #dc2626;
+  --color-danger-bg: #fee2e2;
+  --color-danger-text: #991b1b;
+  --color-success: #16a34a;
+  --color-success-bg: #dcfce7;
+  --color-amber-bg: rgba(217, 119, 6, 0.08);
+  --color-orange-bg: rgba(234, 88, 12, 0.1);
+  --color-red-bg: rgba(220, 38, 38, 0.08);
+
+  /* Priority accents */
+  --priority-low: #6b7280;
+  --priority-medium: #2563eb;
+  --priority-high: #d97706;
+  --priority-urgent: #dc2626;
+
+  /* Typography */
+  --font-ui: 'Geist', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+
+  /* Radii */
+  --radius-chip: 6px;
+  --radius-control: 10px;
+  --radius-card: 12px;
+  --radius-modal: 16px;
+
+  /* Elevation */
+  --elevation-1: 0 1px 2px 0 rgba(30, 30, 46, 0.04);
+  --elevation-2: 0 4px 12px -2px rgba(30, 30, 46, 0.08), 0 2px 4px -1px rgba(30, 30, 46, 0.04);
+  --elevation-3: 0 10px 25px -5px rgba(30, 30, 46, 0.1), 0 8px 10px -6px rgba(30, 30, 46, 0.05);
+  --elevation-4: 0 20px 40px -12px rgba(30, 30, 46, 0.16);
+  --scrim: rgba(30, 30, 46, 0.35);
+
+  /* Spacing (8pt scale) */
+  --space-2xs: 2px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-base: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-base: 400ms;
+
+  /* Aging / hover composition, read by .task-card's single transform rule */
+  --aging-offset: 0px;
+  --hover-lift: 0px;
+}
