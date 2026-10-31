@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as usersApi from '../api/users';
+import * as ws from '../api/workspace';
 import { useAuth } from '../context/AuthContext';
 import { useLive } from '../context/LiveContext';
 import { Card, PageHeader, Toggle } from '../components/ui';
@@ -50,7 +51,10 @@ function ProfileCard() {
         <div className="setting-row">
           <div>
             <strong>Email me notifications</strong>
-            <span className="muted small">Task assigned to you and task completed emails. Needs SMTP set up on the server.</span>
+            <span className="muted small">
+              Emails when a task is assigned to you, completed, or gets a comment. Security emails (like password changes)
+              are always sent.
+            </span>
           </div>
           <Toggle checked={emailNotifications} onChange={setEmailNotifications} label="Email me notifications" />
         </div>
@@ -170,13 +174,101 @@ function AccessCard() {
   );
 }
 
+const PROVIDER_LABEL = { smtp: 'SMTP', resend: 'Resend API', brevo: 'Brevo API' };
+const TEMPLATE_LABEL = {
+  welcome: 'Welcome',
+  'task-assigned': 'Task assigned',
+  'task-completed': 'Task completed',
+  'task-comment': 'New comment',
+  'password-changed': 'Password changed',
+};
+
+// Admin only: shows which email provider the server uses, sends a test
+// email and previews every template with sample data.
+function EmailDeliveryCard() {
+  const { user } = useAuth();
+  const [info, setInfo] = useState(null);
+  const [to, setTo] = useState(user?.email || '');
+  const [sending, setSending] = useState(false);
+  const [status, setStatus] = useState({ type: '', text: '' });
+  const [template, setTemplate] = useState('task-assigned');
+  const [preview, setPreview] = useState(null);
+
+  useEffect(() => {
+    ws.getEmailStatus().then(setInfo).catch(() => setInfo({ configured: false, provider: null }));
+  }, []);
+
+  useEffect(() => {
+    ws.previewEmail(template).then(setPreview).catch(() => setPreview(null));
+  }, [template]);
+
+  const send = async (e) => {
+    e.preventDefault();
+    setSending(true);
+    setStatus({ type: '', text: '' });
+    try {
+      const r = await ws.sendTestEmail(to);
+      setStatus({ type: 'success', text: `Test email sent to ${r.to} through ${PROVIDER_LABEL[r.provider] || r.provider}. Check the inbox (and spam).` });
+    } catch (err) {
+      setStatus({ type: 'error', text: err.response?.data?.message || 'Could not send test email' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Card title="Email delivery" subtitle="Admins only. Credentials live in backend/.env and are never shown here.">
+      <div className="form-stack">
+        <div className="status-line">
+          <span className={`chip ${info?.configured ? 'chip-accent' : 'chip-muted'}`}>
+            {info === null ? 'Checking…' : info.configured ? `Active: ${PROVIDER_LABEL[info.provider]}` : 'Not configured'}
+          </span>
+          {info?.configured && <span className="muted small">From: {info.from}</span>}
+        </div>
+        {info && !info.configured && (
+          <p className="muted small">
+            Add RESEND_API_KEY, BREVO_API_KEY or SMTP_USER/SMTP_PASS to backend/.env and restart the server. Until then,
+            emails are skipped.
+          </p>
+        )}
+        {status.text && <div className={`alert alert-${status.type}`}>{status.text}</div>}
+        <form className="inline-form" onSubmit={send}>
+          <input className="input" type="email" value={to} onChange={(e) => setTo(e.target.value)} aria-label="Send test email to" required />
+          <button type="submit" className="btn btn-secondary" disabled={!info?.configured || sending}>
+            {sending ? 'Sending…' : 'Send test email'}
+          </button>
+        </form>
+
+        <div className="field">
+          <span className="field-label">Template preview</span>
+          <div className="segmented">
+            {Object.keys(TEMPLATE_LABEL).map((t) => (
+              <button key={t} type="button" className={template === t ? 'active' : ''} onClick={() => setTemplate(t)}>
+                {TEMPLATE_LABEL[t]}
+              </button>
+            ))}
+          </div>
+          {preview && (
+            <>
+              <span className="muted small">Subject: {preview.subject}</span>
+              <iframe title="Email preview" className="email-preview" srcDoc={preview.html} sandbox="" />
+            </>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export default function Settings() {
+  const { isAdmin } = useAuth();
   return (
     <div className="page page-narrow">
       <PageHeader title="Settings" subtitle="Your profile, password and notification preferences." />
       <ProfileCard />
       <PushCard />
       <PasswordCard />
+      {isAdmin && <EmailDeliveryCard />}
       <AccessCard />
     </div>
   );

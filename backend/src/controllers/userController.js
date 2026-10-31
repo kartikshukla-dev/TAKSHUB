@@ -5,6 +5,7 @@ const Department = require('../models/Department');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { startOfDay } = require('../utils/taskQuery');
+const { sendPasswordChangedEmail } = require('../services/emailService');
 
 const PUBLIC_FIELDS = 'name email role avatar jobTitle department';
 
@@ -107,6 +108,8 @@ const changePassword = catchAsync(async (req, res) => {
   }
   user.passwordHash = newPassword;
   await user.save();
+  // Security notice: always sent, regardless of notification settings.
+  sendPasswordChangedEmail({ user }).catch((err) => console.error('[email] password-changed failed:', err.message));
   res.status(200).json({ message: 'Password updated' });
 });
 

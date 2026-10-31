@@ -3,6 +3,15 @@ const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { signToken } = require('../utils/jwt');
+const { sendWelcomeEmail } = require('../services/emailService');
+
+function googleConfigured() {
+  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+}
+
+function frontendUrl() {
+  return (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+}
 
 const register = catchAsync(async (req, res) => {
   const { name, email, password, role } = req.body;
@@ -27,6 +36,7 @@ const register = catchAsync(async (req, res) => {
   });
 
   const token = signToken(user);
+  sendWelcomeEmail({ user }).catch((err) => console.error('[email] welcome failed:', err.message));
   res.status(201).json({ token, user: user.toSafeJSON() });
 });
 
@@ -50,21 +60,42 @@ const me = catchAsync(async (req, res) => {
   res.status(200).json({ user: req.user.toSafeJSON() });
 });
 
-// Kicks off the Google OAuth redirect.
-const googleAuth = passport.authenticate('google', { scope: ['profile', 'email'], session: false });
-
-// Handles the Google OAuth callback, issues a JWT, and redirects to the frontend with it.
-const googleCallback = [
-  passport.authenticate('google', { session: false, failureRedirect: '/api/auth/google/failure' }),
-  (req, res) => {
-    const token = signToken(req.user);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    res.redirect(`${frontendUrl}/oauth/callback?token=${token}`);
-  },
-];
-
-const googleFailure = (req, res) => {
-  res.status(401).json({ message: 'Google authentication failed' });
+// GET /api/auth/providers : lets the login page hide the Google button
+// when the server has no Google credentials.
+const providers = (req, res) => {
+  res.status(200).json({ google: googleConfigured() });
 };
 
-module.exports = { register, login, me, googleAuth, googleCallback, googleFailure };
+function loginError(res, code) {
+  res.redirect(`${frontendUrl()}/login?error=${encodeURIComponent(code)}`);
+}
+
+// Kicks off the Google OAuth redirect.
+const googleAuth = (req, res, next) => {
+  if (!googleConfigured()) return loginError(res, 'google_not_configured');
+  return passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    session: false,
+    prompt: 'select_account',
+  })(req, res, next);
+};
+
+// Handles the Google OAuth callback, issues a JWT and hands it to the
+// frontend in the URL fragment (fragments are never sent to servers or
+// written to access logs, unlike query strings).
+const googleCallback = (req, res, next) => {
+  if (!googleConfigured()) return loginError(res, 'google_not_configured');
+  return passport.authenticate('google', { session: false }, (err, user) => {
+    if (err) {
+      console.error('[auth] Google login failed:', err.message);
+      return loginError(res, err.code === 'NO_EMAIL' ? 'google_no_email' : 'google_failed');
+    }
+    if (!user) return loginError(res, 'google_cancelled');
+    const token = signToken(user);
+    return res.redirect(`${frontendUrl()}/oauth/callback#token=${encodeURIComponent(token)}`);
+  })(req, res, next);
+};
+
+const googleFailure = (req, res) => loginError(res, 'google_failed');
+
+module.exports = { register, login, me, providers, googleAuth, googleCallback, googleFailure };

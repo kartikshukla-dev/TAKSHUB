@@ -6,7 +6,11 @@ const catchAsync = require('../utils/catchAsync');
 const { diffTaskFields } = require('../utils/taskDiff');
 const { canViewTask, assertCanViewProject } = require('../utils/access');
 const { buildTaskFilter, sortTasks, TASK_POPULATE, USER_FIELDS } = require('../utils/taskQuery');
-const { sendTaskCreatedEmail, sendTaskCompletedEmail } = require('../services/emailService');
+const {
+  sendTaskCreatedEmail,
+  sendTaskCompletedEmail,
+  sendTaskCommentEmail,
+} = require('../services/emailService');
 const { emitTaskEvent } = require('../services/socketService');
 const { notify } = require('../services/notificationService');
 const gridfs = require('../services/gridfsService');
@@ -95,6 +99,7 @@ const createTask = catchAsync(async (req, res) => {
         project,
         assignee: populated.assignee,
         reporter: populated.reporter,
+        actor: req.user,
       }).catch((err) => console.error('[email] task-created failed:', err.message));
     }
   }
@@ -162,6 +167,17 @@ const updateTask = catchAsync(async (req, res) => {
       text: `${req.user.name} assigned you ${ref}: ${task.title}`,
       link,
     });
+    // No email when you assign a task to yourself.
+    if (newAssignee !== req.user._id.toString() && (await wantsEmail(populated.assignee))) {
+      sendTaskCreatedEmail({
+        task: populated,
+        project,
+        assignee: populated.assignee,
+        reporter: populated.reporter,
+        actor: req.user,
+        reassigned: true,
+      }).catch((err) => console.error('[email] task-assigned failed:', err.message));
+    }
   }
   if (task.status !== previousStatus) {
     notify([task.assignee, task.reporter], {
@@ -182,6 +198,7 @@ const updateTask = catchAsync(async (req, res) => {
       project,
       assignee: assigneeOk ? populated.assignee : null,
       reporter: reporterOk ? populated.reporter : null,
+      actor: req.user,
     }).catch((err) => console.error('[email] task-completed failed:', err.message));
   }
 
@@ -229,6 +246,18 @@ const addComment = catchAsync(async (req, res) => {
     text: `${req.user.name} commented on ${taskRef(task, project)}: ${task.title}`,
     link: taskLink(task, project),
   });
+
+  // Email the assignee and reporter (not the commenter), if they opted in.
+  const me = req.user._id.toString();
+  const people = [populated.assignee, populated.reporter].filter(
+    (p, i, arr) => p && p._id.toString() !== me && arr.findIndex((q) => q && q._id.equals(p._id)) === i
+  );
+  const optedIn = (await Promise.all(people.map(async (p) => ((await wantsEmail(p)) ? p : null)))).filter(Boolean);
+  if (optedIn.length) {
+    sendTaskCommentEmail({ task: populated, project, recipients: optedIn, actor: req.user, comment: text }).catch((err) =>
+      console.error('[email] task-comment failed:', err.message)
+    );
+  }
 
   res.status(201).json({ task: populated });
 });

@@ -23,3 +23,7 @@ export const markConversationRead = (id) => apiClient.post(`/chat/conversations/
 export const listNotifications = () => apiClient.get('/notifications').then((r) => r.data);
 export const markNotificationRead = (id) => apiClient.post(`/notifications/${id}/read`);
 export const markAllNotificationsRead = () => apiClient.post('/notifications/read-all');
+
+export const getEmailStatus = () => apiClient.get('/admin/email/status').then((r) => r.data);
+export const sendTestEmail = (to) => apiClient.post('/admin/email/test', { to }).then((r) => r.data);
+export const previewEmail = (template) => apiClient.get(`/admin/email/preview/${template}`).then((r) => r.data);

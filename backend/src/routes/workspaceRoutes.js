@@ -21,13 +21,14 @@ const {
 } = require('../controllers/chatController');
 const { listNotifications, markRead, markAllRead } = require('../controllers/notificationController');
 const { search } = require('../controllers/searchController');
+const emailAdmin = require('../controllers/emailController');
 
 const router = express.Router();
 const admin = requireRole('admin');
 
 // Auth only on this router's own paths, so unknown /api routes still 404.
 router.use(
-  ['/tasks', '/stats', '/activity', '/departments', '/todos', '/chat', '/notifications', '/search'],
+  ['/tasks', '/stats', '/activity', '/departments', '/todos', '/chat', '/notifications', '/search', '/admin'],
   requireAuth
 );
 
@@ -59,5 +60,9 @@ router.post('/notifications/read-all', markAllRead);
 router.post('/notifications/:id/read', markRead);
 
 router.get('/search', search);
+
+router.get('/admin/email/status', admin, emailAdmin.getStatus);
+router.post('/admin/email/test', admin, emailAdmin.sendTest);
+router.get('/admin/email/preview/:template', admin, emailAdmin.preview);
 
 module.exports = router;

@@ -4,6 +4,7 @@ const {
   register,
   login,
   me,
+  providers,
   googleAuth,
   googleCallback,
   googleFailure,
@@ -14,6 +15,7 @@ const router = express.Router();
 router.post('/register', register);
 router.post('/login', login);
 router.get('/me', requireAuth, me);
+router.get('/providers', providers);
 
 router.get('/google', googleAuth);
 router.get('/google/callback', googleCallback);

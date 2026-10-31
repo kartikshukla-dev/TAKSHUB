@@ -9,6 +9,7 @@ vi.mock('./api/auth', () => ({
   login: vi.fn(),
   register: vi.fn(),
   fetchMe: vi.fn().mockRejectedValue(new Error('no session')),
+  getProviders: vi.fn().mockResolvedValue({ google: false }),
   googleLoginUrl: () => 'http://localhost:5000/api/auth/google',
 }));
 

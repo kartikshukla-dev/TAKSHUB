@@ -41,14 +41,38 @@ Run tests: `npm test`.
 
 ## Configuring integrations
 
-- **Google OAuth**: create OAuth 2.0 credentials in the Google Cloud Console, set the
-  authorized redirect URI to `http://localhost:5000/api/auth/google/callback`, and put the
-  client ID/secret in `backend/.env`. Without these set, Google login is skipped (email/password
-  still works).
-- **Email (Nodemailer/SMTP)**: fill `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` in `backend/.env`.
-  For Gmail, use an [App Password](https://support.google.com/accounts/answer/185833) rather
-  than your real password. Without SMTP configured, emails are skipped (logged as a warning)
-  so the rest of the app still works.
+All keys go in `backend/.env` (see `backend/.env.example`). Restart the backend after editing it.
+
+### Google login
+1. Google Cloud Console → **APIs & Services → OAuth consent screen**: choose *Internal*
+   (Google Workspace) or *External*, fill the app name and support email. For *External*
+   while testing, add your team's emails as test users.
+2. **Credentials → Create credentials → OAuth client ID → Web application**.
+   - Authorized JavaScript origin: `http://localhost:5173`
+   - Authorized redirect URI: `http://localhost:5000/api/auth/google/callback`
+3. Put the values in `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+
+The "Continue with Google" button only appears once both are set. A Google account with the
+same email as an existing account is linked to it; otherwise a new Employee account is created.
+
+### Email
+Pick one provider. `EMAIL_PROVIDER` forces a choice; if it's empty the first one with keys wins
+(Resend → Brevo → SMTP). With none set, emails are skipped and the app keeps working.
+
+| Provider | Keys | Notes |
+|---|---|---|
+| Resend API | `RESEND_API_KEY` | Without a verified domain, Resend only delivers to your own account email. Verify a domain to email the team. |
+| Brevo API | `BREVO_API_KEY` | Verify the sender email in Brevo (Senders & IP) and use it in `EMAIL_FROM`. |
+| SMTP | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | For Gmail, use an [App Password](https://support.google.com/accounts/answer/185833). |
+
+`EMAIL_FROM` is the sender shown in the inbox, e.g. `"Oncare <no-reply@yourdomain.com>"`.
+
+Admins can check the active provider, send a test email and preview every template in
+**Settings → Email delivery**.
+
+Emails sent: welcome (sign-up, including Google), task assigned (new or reassigned), task
+completed, new comment, password changed. Task emails respect each person's "Email me
+notifications" setting; security emails are always sent.
 
 ## Feature overview
 - Email/password + Google OAuth login (JWT sessions), Admin/Member roles

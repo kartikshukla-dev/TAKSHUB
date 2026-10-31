@@ -1,5 +1,6 @@
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('../models/User');
+const { sendWelcomeEmail } = require('../services/emailService');
 
 /**
  * Registers the Google OAuth2 strategy with Passport.
@@ -20,7 +21,7 @@ module.exports = function configurePassport(passport) {
       {
         clientID: GOOGLE_CLIENT_ID,
         clientSecret: GOOGLE_CLIENT_SECRET,
-        callbackURL: GOOGLE_CALLBACK_URL,
+        callbackURL: GOOGLE_CALLBACK_URL || `http://localhost:${process.env.PORT || 5000}/api/auth/google/callback`,
       },
       async (accessToken, refreshToken, profile, done) => {
         try {
@@ -35,26 +36,34 @@ module.exports = function configurePassport(passport) {
 };
 
 async function findOrCreateGoogleUser(profile) {
-  const email = profile.emails && profile.emails[0] && profile.emails[0].value;
+  const rawEmail = profile.emails && profile.emails[0] && profile.emails[0].value;
+  const email = rawEmail ? rawEmail.trim().toLowerCase() : null;
 
   let user = await User.findOne({ googleId: profile.id });
   if (user) return user;
 
-  if (email) {
-    user = await User.findOne({ email });
-    if (user) {
-      user.googleId = profile.id;
-      await user.save();
-      return user;
-    }
+  if (!email) {
+    const err = new Error('Google did not share an email address for this account');
+    err.code = 'NO_EMAIL';
+    throw err;
+  }
+
+  // Link Google to an existing email/password account with the same email.
+  user = await User.findOne({ email });
+  if (user) {
+    user.googleId = profile.id;
+    if (!user.avatar && profile.photos && profile.photos[0]) user.avatar = profile.photos[0].value;
+    await user.save();
+    return user;
   }
 
   user = await User.create({
-    name: profile.displayName || 'Google User',
+    name: profile.displayName || email.split('@')[0],
     email,
     googleId: profile.id,
     avatar: (profile.photos && profile.photos[0] && profile.photos[0].value) || '',
   });
+  sendWelcomeEmail({ user, viaGoogle: true }).catch((e) => console.error('[email] welcome failed:', e.message));
   return user;
 }
 
