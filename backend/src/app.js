@@ -9,6 +9,7 @@ const authRoutes = require('./routes/authRoutes');
 const projectRoutes = require('./routes/projectRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const userRoutes = require('./routes/userRoutes');
+const workspaceRoutes = require('./routes/workspaceRoutes');
 
 function createApp() {
   const app = express();
@@ -33,6 +34,7 @@ function createApp() {
   app.use('/api/projects', projectRoutes);
   app.use('/api/projects/:projectId/tasks', taskRoutes);
   app.use('/api/users', userRoutes);
+  app.use('/api', workspaceRoutes);
 
   app.use((req, res) => {
     res.status(404).json({ message: 'Route not found' });

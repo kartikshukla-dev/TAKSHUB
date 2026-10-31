@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { googleLoginUrl } from '../api/auth';
+import { AuthLayout, GoogleButton } from './AuthLayout';
 
 export default function Register() {
   const { register } = useAuth();
@@ -18,7 +18,7 @@ export default function Register() {
     setSubmitting(true);
     try {
       await register(form);
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
     } finally {
@@ -27,55 +27,58 @@ export default function Register() {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-panel">
-      <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>Create your account</h1>
-        <p className="muted">Join your company's Onacre workspace</p>
+    <AuthLayout>
+      <form className="form-stack" onSubmit={handleSubmit}>
+        <div>
+          <h1 className="auth-title">Create your account</h1>
+          <p className="muted">Join your company&apos;s workspace.</p>
+        </div>
 
         {error && <div className="alert alert-error">{error}</div>}
 
-        <label htmlFor="name">Full name</label>
-        <input id="name" value={form.name} onChange={update('name')} required />
+        <div className="field">
+          <label htmlFor="name">Full name</label>
+          <input id="name" className="input" value={form.name} onChange={update('name')} required autoFocus />
+        </div>
 
-        <label htmlFor="email">Email</label>
-        <input id="email" type="email" value={form.email} onChange={update('email')} required />
+        <div className="field">
+          <label htmlFor="email">Email</label>
+          <input id="email" className="input" type="email" value={form.email} onChange={update('email')} required />
+        </div>
 
-        <label htmlFor="password">Password</label>
-        <input
-          id="password"
-          type="password"
-          value={form.password}
-          onChange={update('password')}
-          minLength={6}
-          required
-        />
+        <div className="field">
+          <label htmlFor="password">Password</label>
+          <input
+            id="password"
+            className="input"
+            type="password"
+            value={form.password}
+            onChange={update('password')}
+            minLength={6}
+            required
+          />
+          <span className="field-hint">At least 6 characters.</span>
+        </div>
 
-        <label htmlFor="role">Role</label>
-        <select id="role" value={form.role} onChange={update('role')}>
-          <option value="member">Member</option>
-          <option value="admin">Admin</option>
-        </select>
+        <div className="field">
+          <label htmlFor="role">Role</label>
+          <select id="role" className="input" value={form.role} onChange={update('role')}>
+            <option value="member">Employee</option>
+            <option value="manager">Manager</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
 
-        <button type="submit" className="btn btn-primary" disabled={submitting}>
+        <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
           {submitting ? 'Creating account...' : 'Register'}
         </button>
+        <GoogleButton />
 
-        <a className="btn btn-google" href={googleLoginUrl()}>
-          Continue with Google
-        </a>
-
-        <p className="muted">
-          Already have an account? <Link to="/login">Log in</Link>
-        </p>
-      </form>
-      </div>
-      <div className="auth-showcase">
-        <div className="auth-showcase-content">
-          <h2>Plan. Assign. Ship. Together.</h2>
-          <p>Bring your whole team onto Onacre — projects, tasks, and conversations in one place.</p>
+        <div className="auth-links">
+          <span className="muted">Already have an account?</span>
+          <Link to="/login">Log in</Link>
         </div>
-      </div>
-    </div>
+      </form>
+    </AuthLayout>
   );
 }

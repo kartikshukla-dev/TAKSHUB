@@ -8,19 +8,23 @@ const {
   updateProject,
   deleteProject,
   addMember,
+  removeMember,
   getActivityFeed,
 } = require('../controllers/projectController');
 
 const router = express.Router();
 
+const staff = requireRole('admin', 'manager');
+
 router.use(requireAuth);
 
-router.post('/', requireRole('admin'), createProject);
+router.post('/', staff, createProject);
 router.get('/', listProjects);
 router.get('/:id', getProject);
-router.patch('/:id', requireRole('admin'), updateProject);
+router.patch('/:id', staff, updateProject);
 router.delete('/:id', requireRole('admin'), deleteProject);
-router.post('/:id/members', requireRole('admin'), addMember);
+router.post('/:id/members', staff, addMember);
+router.delete('/:id/members/:userId', staff, removeMember);
 router.get('/:id/activity', getActivityFeed);
 
 module.exports = router;

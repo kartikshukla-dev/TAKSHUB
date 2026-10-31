@@ -69,9 +69,31 @@ export function AuthProvider({ children }) {
 
   const logout = () => clearSession();
 
+  // Used by Settings after a profile update.
+  const updateCurrentUser = (nextUser) => {
+    setUser(nextUser);
+    localStorage.setItem('taskhub_user', JSON.stringify(nextUser));
+  };
+
+  const isAdmin = user?.role === 'admin';
+  const isStaff = isAdmin || user?.role === 'manager';
+  const userId = user ? String(user._id || user.id) : null;
+
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, register, login, loginWithToken, logout, isAdmin: user?.role === 'admin' }}
+      value={{
+        user,
+        userId,
+        token,
+        loading,
+        register,
+        login,
+        loginWithToken,
+        logout,
+        updateCurrentUser,
+        isAdmin,
+        isStaff,
+      }}
     >
       {children}
     </AuthContext.Provider>

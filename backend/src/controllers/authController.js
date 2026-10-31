@@ -23,7 +23,7 @@ const register = catchAsync(async (req, res) => {
     name,
     email,
     passwordHash: password,
-    role: role === 'admin' ? 'admin' : 'member',
+    role: ['admin', 'manager'].includes(role) ? role : 'member',
   });
 
   const token = signToken(user);
@@ -46,6 +46,7 @@ const login = catchAsync(async (req, res) => {
 });
 
 const me = catchAsync(async (req, res) => {
+  await req.user.populate('department', 'name');
   res.status(200).json({ user: req.user.toSafeJSON() });
 });
 

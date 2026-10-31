@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { googleLoginUrl } from '../api/auth';
+import { AuthLayout, GoogleButton } from './AuthLayout';
 
 export default function Login() {
   const { login } = useAuth();
@@ -17,7 +17,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       await login({ email, password });
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
     } finally {
@@ -26,53 +26,52 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-panel">
-      <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>Welcome back</h1>
-        <p className="muted">Log in to your Onacre workspace</p>
+    <AuthLayout>
+      <form className="form-stack" onSubmit={handleSubmit}>
+        <div>
+          <h1 className="auth-title">Welcome back</h1>
+          <p className="muted">Use your work email and password.</p>
+        </div>
 
         {error && <div className="alert alert-error">{error}</div>}
 
-        <label htmlFor="email">Email</label>
-        <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          autoComplete="email"
-        />
+        <div className="field">
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            className="input"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoFocus
+            autoComplete="email"
+          />
+        </div>
 
-        <label htmlFor="password">Password</label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          autoComplete="current-password"
-        />
+        <div className="field">
+          <label htmlFor="password">Password</label>
+          <input
+            id="password"
+            className="input"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
+        </div>
 
-        <button type="submit" className="btn btn-primary" disabled={submitting}>
+        <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
           {submitting ? 'Logging in...' : 'Log in'}
         </button>
+        <GoogleButton />
 
-        <a className="btn btn-google" href={googleLoginUrl()}>
-          Continue with Google
-        </a>
-
-        <p className="muted">
-          No account? <Link to="/register">Register</Link>
-        </p>
-      </form>
-      </div>
-      <div className="auth-showcase">
-        <div className="auth-showcase-content">
-          <h2>Plan. Assign. Ship. Together.</h2>
-          <p>Onacre brings your team's projects, tasks, and conversations into one focused workspace.</p>
+        <div className="auth-links">
+          <span className="muted">No account yet?</span>
+          <Link to="/register">Create an account</Link>
         </div>
-      </div>
-    </div>
+      </form>
+    </AuthLayout>
   );
 }

@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
 
+const STATUSES = ['todo', 'in-progress', 'in-review', 'done'];
+const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+
 const commentSchema = new mongoose.Schema(
   {
     author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -35,19 +38,14 @@ const taskSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '' },
-    status: {
-      type: String,
-      enum: ['todo', 'in-progress', 'done'],
-      default: 'todo',
-    },
-    priority: {
-      type: String,
-      enum: ['low', 'medium', 'high', 'urgent'],
-      default: 'medium',
-    },
+    status: { type: String, enum: STATUSES, default: 'todo' },
+    priority: { type: String, enum: PRIORITIES, default: 'medium' },
+    blocked: { type: Boolean, default: false },
+    // Per-project sequence number; shown as `${project.key}-${number}`.
+    number: { type: Number, default: null },
     project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
-    assignee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-    reporter: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    assignee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    reporter: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     labels: [{ type: String, trim: true }],
     dueDate: { type: Date, default: null },
     comments: [commentSchema],
@@ -59,6 +57,8 @@ const taskSchema = new mongoose.Schema(
 );
 
 // Fields we track in the activity log when changed via the "diff & update" helper.
-taskSchema.statics.TRACKED_FIELDS = ['status', 'priority', 'assignee', 'labels', 'dueDate', 'title'];
+taskSchema.statics.TRACKED_FIELDS = ['status', 'priority', 'assignee', 'labels', 'dueDate', 'title', 'blocked'];
+taskSchema.statics.STATUSES = STATUSES;
+taskSchema.statics.PRIORITIES = PRIORITIES;
 
 module.exports = mongoose.model('Task', taskSchema);

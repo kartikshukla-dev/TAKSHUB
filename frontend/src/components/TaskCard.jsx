@@ -1,12 +1,8 @@
 import { useDraggable } from '@dnd-kit/core';
 import { getAgingStage, getAgingDays } from '../utils/taskAge';
-
-const PRIORITY_COLORS = {
-  low: 'var(--priority-low)',
-  medium: 'var(--priority-medium)',
-  high: 'var(--priority-high)',
-  urgent: 'var(--priority-urgent)',
-};
+import { taskKey, dueState, formatShortDate } from '../utils/format';
+import { Avatar, PriorityBadge } from './ui';
+import Icon from './Icon';
 
 export default function TaskCard({ task, onOpen, isCompleting = false, onCompletingDone }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -17,13 +13,14 @@ export default function TaskCard({ task, onOpen, isCompleting = false, onComplet
     ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
         zIndex: isDragging ? 10 : undefined,
-        opacity: isDragging ? 0.8 : 1,
+        opacity: isDragging ? 0.85 : 1,
       }
     : undefined;
 
   // Aging only applies to tasks still in flight; a "done" task has landed.
   const agingStage = task.status !== 'done' ? getAgingStage(task.createdAt) : 'fresh';
   const agingDays = getAgingDays(task.createdAt);
+  const due = dueState(task);
 
   return (
     <div
@@ -37,9 +34,19 @@ export default function TaskCard({ task, onOpen, isCompleting = false, onComplet
       onAnimationEnd={() => isCompleting && onCompletingDone?.(task._id)}
     >
       <div className="task-card-top">
-        <span className="priority-dot" style={{ backgroundColor: PRIORITY_COLORS[task.priority] }} />
-        <span className="task-title">{task.title}</span>
+        <span className="task-key">{taskKey(task)}</span>
+        {task.blocked && (
+          <span className="blocked-tag" title="Blocked">
+            <Icon name="ban" size={12} /> Blocked
+          </span>
+        )}
+        {(agingStage === 'deep-amber' || agingStage === 'red') && (
+          <span className={`aging-badge aging-badge-${agingStage}`}>
+            {agingStage === 'deep-amber' ? 'aging' : `${agingDays} days old`}
+          </span>
+        )}
       </div>
+      <div className="task-title">{task.title}</div>
       {task.labels?.length > 0 && (
         <div className="label-list">
           {task.labels.map((l, idx) => (
@@ -49,14 +56,12 @@ export default function TaskCard({ task, onOpen, isCompleting = false, onComplet
           ))}
         </div>
       )}
-      {(agingStage === 'deep-amber' || agingStage === 'red') && (
-        <span className={`aging-badge aging-badge-${agingStage}`}>
-          {agingStage === 'deep-amber' ? 'aging' : `${agingDays} days old`}
-        </span>
-      )}
       <div className="task-card-bottom">
-        <span className="muted small">{task.assignee ? task.assignee.name : 'Unassigned'}</span>
-        {task.dueDate && <span className="muted small">{new Date(task.dueDate).toLocaleDateString()}</span>}
+        <PriorityBadge priority={task.priority} />
+        <span className="task-card-meta">
+          {task.dueDate && <span className={`due due-${due || 'none'}`}>{formatShortDate(task.dueDate)}</span>}
+          {task.assignee ? <Avatar user={task.assignee} size="xs" /> : <span className="avatar avatar-xs avatar-empty">?</span>}
+        </span>
       </div>
     </div>
   );

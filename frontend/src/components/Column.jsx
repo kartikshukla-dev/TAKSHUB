@@ -7,8 +7,9 @@ export default function Column({ id, title, tasks, onOpenTask, justCompleted, on
   return (
     <div ref={setNodeRef} className={`board-column ${isOver ? 'board-column-over' : ''}`}>
       <div className="board-column-header">
+        <span className={`status-dot status-dot-${id}`} />
         <h3>{title}</h3>
-        <span className="muted small mono">{tasks.length}</span>
+        <span className="count-chip">{tasks.length}</span>
       </div>
       <div className="board-column-body">
         {tasks.map((task) => (
@@ -20,6 +21,7 @@ export default function Column({ id, title, tasks, onOpenTask, justCompleted, on
             onCompletingDone={onCompletingDone}
           />
         ))}
+        {tasks.length === 0 && <div className="board-column-empty">Drop tasks here</div>}
       </div>
     </div>
   );
