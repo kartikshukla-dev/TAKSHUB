@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import PageTransition from './PageTransition';
+import useSmoothScroll from '../hooks/useSmoothScroll';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import { LiveProvider, useLive } from '../context/LiveContext';
 import { TaskUiProvider, useTaskUi } from '../context/TaskUiContext';
 import { invalidateDirectory } from '../hooks/useDirectory';
@@ -140,7 +141,6 @@ function UserMenu() {
 }
 
 function Topbar({ onSearch }) {
-  const { theme, toggleTheme } = useTheme();
   const { openNewTask } = useTaskUi();
   const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
   return (
@@ -154,9 +154,6 @@ function Topbar({ onSearch }) {
         <button type="button" className="btn btn-primary" onClick={() => openNewTask()}>
           <Icon name="plus" size={16} /> New task
         </button>
-        <button type="button" className="icon-btn" onClick={toggleTheme} aria-label="Toggle dark mode">
-          <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
-        </button>
         <NotificationBell />
         <UserMenu />
       </div>
@@ -165,6 +162,7 @@ function Topbar({ onSearch }) {
 }
 
 function ShellLayout() {
+  useSmoothScroll();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('oncare_sidebar') === 'collapsed');
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -192,7 +190,7 @@ function ShellLayout() {
       <div className="shell-main">
         <Topbar onSearch={() => setPaletteOpen(true)} />
         <main className="content">
-          <Outlet />
+          <PageTransition />
         </main>
       </div>
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}

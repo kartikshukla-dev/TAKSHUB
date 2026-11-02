@@ -6,6 +6,7 @@ import Users from './pages/Users';
 import TeamLeads from './pages/TeamLeads';
 import TeamDetail from './pages/TeamDetail';
 import { useAuth } from './context/AuthContext';
+import StageHost from './stage/StageHost';
 import OAuthCallback from './pages/OAuthCallback';
 import Dashboard from './pages/Dashboard';
 import TasksPage from './pages/TasksPage';
@@ -27,6 +28,16 @@ function AdminOnly({ children }) {
 }
 
 export default function App() {
+  return (
+    <>
+      {/* One persistent 3D stage behind every page (login included). */}
+      <StageHost />
+      <AppRoutes />
+    </>
+  );
+}
+
+function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />

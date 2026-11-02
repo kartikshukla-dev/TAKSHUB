@@ -6,6 +6,7 @@ import useTaskChanges from '../hooks/useTaskChanges';
 import InviteModal from '../components/InviteModal';
 import TaskView from '../components/TaskView';
 import Icon from '../components/Icon';
+import { CountUp } from '../components/motion';
 import { Avatar, Card, PageHeader } from '../components/ui';
 import { ROLE_LABEL, timeAgo } from '../utils/format';
 
@@ -68,11 +69,11 @@ export default function TeamDetail() {
       {flash.text && <div className={`alert alert-${flash.type}`}>{flash.text}</div>}
 
       <div className="stat-grid stat-grid-5">
-        <div className="stat-card"><span className="stat-label">People</span><span className="stat-value">{team.members.length}</span></div>
-        <div className="stat-card"><span className="stat-label">Open tasks</span><span className="stat-value">{team.open}</span></div>
-        <div className="stat-card"><span className="stat-label">Overdue</span><span className={`stat-value ${team.overdue ? 'text-danger' : ''}`}>{team.overdue}</span></div>
-        <div className="stat-card"><span className="stat-label">Waiting to be assigned</span><span className="stat-value">{team.unassigned}</span><span className="stat-sub">Sent to this team, no assignee</span></div>
-        <div className="stat-card"><span className="stat-label">Pending invites</span><span className="stat-value">{team.members.filter((m) => m.status === 'invited').length}</span></div>
+        <div className="stat-card"><span className="stat-label">People</span><span className="stat-value"><CountUp value={team.members.length} /></span></div>
+        <div className="stat-card"><span className="stat-label">Open tasks</span><span className="stat-value"><CountUp value={team.open} /></span></div>
+        <div className="stat-card"><span className="stat-label">Overdue</span><span className={`stat-value ${team.overdue ? 'text-danger' : ''}`}><CountUp value={team.overdue} /></span></div>
+        <div className="stat-card"><span className="stat-label">Waiting to be assigned</span><span className="stat-value"><CountUp value={team.unassigned} /></span><span className="stat-sub">Sent to this team, no assignee</span></div>
+        <div className="stat-card"><span className="stat-label">Pending invites</span><span className="stat-value"><CountUp value={team.members.filter((m) => m.status === 'invited').length} /></span></div>
       </div>
 
       <Card title="Team members">

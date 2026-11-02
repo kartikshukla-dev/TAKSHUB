@@ -6,6 +6,7 @@ import useTaskChanges from '../hooks/useTaskChanges';
 import * as ws from '../api/workspace';
 import LineChart from '../components/LineChart';
 import Icon from '../components/Icon';
+import { CountUp } from '../components/motion';
 import { Avatar, Card, EmptyState, PageHeader, StatusPill } from '../components/ui';
 import { WORKSPACE_NAME, taskKey, formatShortDate, dueState, describeActivity, timeAgo } from '../utils/format';
 
@@ -32,7 +33,7 @@ function StatCard({ label, value, sub, to }) {
   const body = (
     <>
       <span className="stat-label">{label}</span>
-      <span className="stat-value">{value}</span>
+      <span className="stat-value"><CountUp value={value} /></span>
       {sub && <span className="stat-sub">{sub}</span>}
     </>
   );

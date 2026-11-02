@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import * as ws from '../api/workspace';
 import useTaskChanges from '../hooks/useTaskChanges';
 import LineChart from '../components/LineChart';
+import { CountUp } from '../components/motion';
 import { Card, PageHeader } from '../components/ui';
 import { RANGES, RangeSelect, ProgressBar } from './Dashboard';
 import { formatDate, formatDuration, STATUS_LABEL, PRIORITY_LABEL } from '../utils/format';
@@ -11,7 +12,7 @@ function Stat({ label, value, sub }) {
   return (
     <div className="stat-card">
       <span className="stat-label">{label}</span>
-      <span className="stat-value">{value}</span>
+      <span className="stat-value">{typeof value === 'number' ? <CountUp value={value} /> : value}</span>
       {sub && <span className="stat-sub">{sub}</span>}
     </div>
   );

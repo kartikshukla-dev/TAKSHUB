@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import * as tasksApi from '../api/tasks';
 import { shouldPlayDropAnimation } from '../utils/dropAnimation';
+import { emitBurst } from '../stage/pointer';
 import { onTaskChange, emitTaskChange } from '../utils/taskEvents';
 import { STATUSES, projectIdOf } from '../utils/format';
 import Column from './Column';
@@ -40,7 +41,13 @@ export default function TaskBoard({ tasks, setTasks, onOpenTask, onError }) {
     const task = tasks.find((t) => t._id === taskId);
     if (!task || task.status === newStatus) return;
 
-    if (shouldPlayDropAnimation(task.status, newStatus)) setJustCompleted(taskId);
+    if (shouldPlayDropAnimation(task.status, newStatus)) {
+      setJustCompleted(taskId);
+      // Shockwave in the 3D background at the drop point.
+      const pt = event.activatorEvent;
+      const end = pt && 'clientX' in pt ? { x: pt.clientX + (event.delta?.x || 0), y: pt.clientY + (event.delta?.y || 0) } : null;
+      if (end) emitBurst((end.x / window.innerWidth) * 2 - 1, -((end.y / window.innerHeight) * 2 - 1));
+    }
 
     // Optimistic update; the server response is the source of truth.
     setTasks((prev) => prev.map((t) => (t._id === taskId ? { ...t, status: newStatus } : t)));

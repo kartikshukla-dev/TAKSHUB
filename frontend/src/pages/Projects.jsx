@@ -5,22 +5,27 @@ import * as projectsApi from '../api/projects';
 import { useUsers, invalidateDirectory } from '../hooks/useDirectory';
 import CreateProjectModal from '../components/CreateProjectModal';
 import Icon from '../components/Icon';
-import { Avatar, EmptyState, PageHeader } from '../components/ui';
+import { Avatar, EmptyState, PageHeader, ProgressRing } from '../components/ui';
+import { GalaxyToggle, Galaxy, useGalaxyMode } from '../components/GalaxySwitch';
+import useTilt from '../hooks/useTilt';
 import { formatShortDate } from '../utils/format';
 import { ProgressBar } from './Dashboard';
 
 function ProjectCard({ project }) {
+  const tilt = useTilt();
   const pct = project.taskCount ? Math.round((project.doneCount / project.taskCount) * 100) : 0;
   return (
-    <Link to={`/projects/${project._id}`} className="project-card">
+    <Link to={`/projects/${project._id}`} className="project-card tilt" {...tilt}>
+      <span className="tilt-glare" aria-hidden="true" />
       <div className="project-card-head">
         <div>
           <h3 className="project-name">{project.name}</h3>
           <span className="mono muted small">{project.key}</span>
+          <span className={`chip ${project.status === 'archived' ? 'chip-muted' : 'chip-accent'}`} style={{ marginLeft: 8 }}>
+            {project.status === 'archived' ? 'Archived' : 'Active'}
+          </span>
         </div>
-        <span className={`chip ${project.status === 'archived' ? 'chip-muted' : 'chip-accent'}`}>
-          {project.status === 'archived' ? 'Archived' : 'Active'}
-        </span>
+        <ProgressRing value={pct / 100} />
       </div>
       <p className="project-desc">{project.description || 'No description'}</p>
       <div className="project-progress">
@@ -47,6 +52,7 @@ export default function Projects() {
   const [tab, setTab] = useState('active');
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const galaxy = useGalaxyMode('projects');
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState('');
 
@@ -81,13 +87,16 @@ export default function Projects() {
         }
       />
 
-      <div className="tabs">
-        <button type="button" className={tab === 'active' ? 'tab tab-active' : 'tab'} onClick={() => setTab('active')}>
-          Active
-        </button>
-        <button type="button" className={tab === 'archived' ? 'tab tab-active' : 'tab'} onClick={() => setTab('archived')}>
-          Archived
-        </button>
+      <div className="tabs-row">
+        <div className="tabs">
+          <button type="button" className={tab === 'active' ? 'tab tab-active' : 'tab'} onClick={() => setTab('active')}>
+            Active
+          </button>
+          <button type="button" className={tab === 'archived' ? 'tab tab-active' : 'tab'} onClick={() => setTab('archived')}>
+            Archived
+          </button>
+        </div>
+        <GalaxyToggle {...galaxy} />
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -113,11 +122,26 @@ export default function Projects() {
         </EmptyState>
       )}
 
-      <div className="project-grid">
-        {projects.map((p) => (
-          <ProjectCard key={p._id} project={p} />
+      {projects.length > 0 &&
+        (galaxy.mode === 'galaxy' ? (
+          <Galaxy
+            items={projects.map((p) => ({
+              id: p._id,
+              name: p.name,
+              total: p.taskCount,
+              done: p.doneCount,
+              overdue: p.overdueCount,
+              moons: (p.taskCount || 0) - (p.doneCount || 0),
+              href: `/projects/${p._id}`,
+            }))}
+          />
+        ) : (
+          <div className="project-grid">
+            {projects.map((p) => (
+              <ProjectCard key={p._id} project={p} />
+            ))}
+          </div>
         ))}
-      </div>
 
       {showCreate && <CreateProjectModal users={users} onClose={() => setShowCreate(false)} onCreate={handleCreate} />}
     </div>

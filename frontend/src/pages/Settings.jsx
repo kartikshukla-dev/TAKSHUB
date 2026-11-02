@@ -3,6 +3,7 @@ import * as usersApi from '../api/users';
 import * as ws from '../api/workspace';
 import { useAuth } from '../context/AuthContext';
 import { useLive } from '../context/LiveContext';
+import { useEffects } from '../context/EffectsContext';
 import { Card, PageHeader, Toggle } from '../components/ui';
 import { ROLE_LABEL, WORKSPACE_NAME } from '../utils/format';
 
@@ -64,6 +65,25 @@ function ProfileCard() {
           </button>
         </div>
       </form>
+    </Card>
+  );
+}
+
+function EffectsCard() {
+  const { reduceEffects, setReduceEffects, reducedMotion, webgl } = useEffects();
+  return (
+    <Card title="Visual effects" subtitle="The 3D background and animations. Saved for this browser.">
+      <div className="setting-row">
+        <div>
+          <strong>Reduce effects</strong>
+          <span className="muted small">
+            Turns off the 3D background and most animations. Use it on slower computers or if motion bothers you.
+            {reducedMotion && ' Your system asks for reduced motion, so effects are already off.'}
+            {!webgl && ' This browser has no WebGL, so a static background is shown.'}
+          </span>
+        </div>
+        <Toggle checked={reduceEffects} onChange={setReduceEffects} label="Reduce effects" />
+      </div>
     </Card>
   );
 }
@@ -222,6 +242,7 @@ export default function Settings() {
       <PageHeader title="Settings" subtitle="Your profile, password and notification preferences." />
       <ProfileCard />
       <PushCard />
+      <EffectsCard />
       {isAdmin && <EmailDeliveryCard />}
       <AccessCard />
     </div>

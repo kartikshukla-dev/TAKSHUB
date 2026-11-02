@@ -60,6 +60,30 @@ request per 45 s) and **Google**. There is no password login and no self sign-up
 Super Admin is whoever is listed in `SUPERADMIN_EMAIL`. With no email provider configured, the
 code is printed in the backend console (handy for local demos only).
 
+## Look and 3D
+
+Dark only, cinematic: glass panels over one live WebGL stage (React Three Fiber v8 + drei,
+three.js) that sits behind every page.
+
+| Page | Background |
+|---|---|
+| Login, Dashboard | Oncare ribbon (glass/iridescent, follows the mouse) + particles |
+| Projects, Team Leads | **Galaxy view**: projects/teams as planets, open tasks/members as moons, red ring when overdue; click a planet to open it. **Grid** toggle shows the cards (3D tilt + progress ring). |
+| Other pages | Particles that morph per page: galaxy (tasks), ring (calendar), grid (team/users), wave (chat), bars (reports/activity), sphere (settings/to-dos) |
+
+Motion: page transitions (Motion), heading reveal (GSAP SplitText), staggered entrances,
+count-up stats, Lenis smooth scroll, modal zoom-in, and a shockwave in the particles when a
+card is dropped into Done. Hovering a task row shows a floating preview card.
+
+Performance and comfort:
+- 3D code is lazy-loaded in its own chunks; the first screen doesn't wait for three.js.
+- Quality is picked from the device (CPU cores, memory, mobile, data saver) and stepped down
+  automatically when the frame rate drops; rendering pauses when the tab is hidden.
+- **Settings → Visual effects → Reduce effects** turns the 3D and most animation off (saved per
+  browser). The OS "reduce motion" setting does the same. Without WebGL a static gradient is shown.
+- Optional Spline ribbon: set `VITE_SPLINE_RIBBON_URL` (frontend env, Vercel → redeploy). If it's
+  empty or fails to load, the coded ribbon is used.
+
 ## Deploying
 
 The backend is a long-running Node server (Socket.io for live chat/notifications), so it can't
