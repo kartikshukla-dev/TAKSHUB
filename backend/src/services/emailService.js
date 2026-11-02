@@ -25,16 +25,20 @@ function detectProvider() {
   // Jest sets NODE_ENV=test and tests load the real .env; never send real
   // mail from a test run unless a mock transporter was injected.
   if (process.env.NODE_ENV === 'test') return null;
+  const ready = {
+    resend: Boolean(env('RESEND_API_KEY')),
+    brevo: Boolean(env('BREVO_API_KEY')),
+    smtp: Boolean(env('SMTP_HOST') && env('SMTP_USER') && env('SMTP_PASS')),
+  };
+  // An explicit choice only counts once its credentials are filled in, so a
+  // half-configured .env falls back to "not configured" instead of erroring.
   const explicit = env('EMAIL_PROVIDER').toLowerCase();
-  if (['smtp', 'resend', 'brevo'].includes(explicit)) return explicit;
-  if (env('RESEND_API_KEY')) return 'resend';
-  if (env('BREVO_API_KEY')) return 'brevo';
-  if (env('SMTP_HOST') && env('SMTP_USER') && env('SMTP_PASS')) return 'smtp';
-  return null;
+  if (explicit in ready) return ready[explicit] ? explicit : null;
+  return ['resend', 'brevo', 'smtp'].find((p) => ready[p]) || null;
 }
 
 function fromAddress() {
-  return env('EMAIL_FROM') || env('SMTP_FROM') || 'Oncare <no-reply@oncare.local>';
+  return env('EMAIL_FROM') || env('SMTP_FROM') || 'TaskHub <no-reply@oncarecancer.com>';
 }
 
 // "Name <email>" -> { name, email }
@@ -193,8 +197,8 @@ async function sendTaskCreatedEmail({ task, project, assignee, reporter, actor, 
  * Fired when a task's status transitions to "done". Notifies both the
  * assignee and the reporter.
  */
-async function sendTaskCompletedEmail({ task, project, assignee, reporter, actor }) {
-  const to = [...new Set([assignee?.email, reporter?.email].filter(Boolean))];
+async function sendTaskCompletedEmail({ task, project, assignee, reporter, actor, others = [] }) {
+  const to = [...new Set([assignee?.email, reporter?.email, ...others.map((o) => o?.email)].filter(Boolean))];
   if (to.length === 0) return null;
   const mail = templates.taskCompleted({
     task,
@@ -213,14 +217,36 @@ async function sendTaskCommentEmail({ task, project, recipients: people, actor, 
   return sendMail({ to, ...templates.taskComment({ task, project, actor, comment }) });
 }
 
-async function sendWelcomeEmail({ user, viaGoogle }) {
-  if (!user?.email) return null;
-  return sendMail({ to: user.email, ...templates.welcome({ user, viaGoogle }) });
+// Personalised emails go out one per recipient (they greet by name).
+async function sendEach(recipients, build) {
+  const seen = new Set();
+  const list = recipients.filter((r) => r?.email && !seen.has(r.email) && seen.add(r.email));
+  return Promise.all(list.map((r) => sendQuietly('notification', { to: r.email, ...build(r) })));
 }
 
-async function sendPasswordChangedEmail({ user }) {
-  if (!user?.email) return null;
-  return sendMail({ to: user.email, ...templates.passwordChanged({ user }) });
+async function sendTaskRequestEmail({ task, project, actor, recipients }) {
+  return sendEach(recipients, (recipient) => templates.taskRequest({ task, project, actor, recipient }));
+}
+
+async function sendTaskUpdatedEmail({ task, project, actor, changes, recipients }) {
+  if (!changes.length) return [];
+  return sendEach(recipients, (recipient) => templates.taskUpdated({ task, project, actor, changes, recipient }));
+}
+
+// Returns whether a provider actually accepted the code email, so the
+// caller can fall back to logging the code in development.
+async function sendLoginCodeEmail({ user, code }) {
+  if (!detectProvider()) return false;
+  await sendMail({ to: user.email, ...templates.loginCode({ user, code }) });
+  return true;
+}
+
+async function sendInviteEmail({ user, invitedBy, team, role }) {
+  return sendMail({ to: user.email, ...templates.invite({ user, invitedBy, team, role }) });
+}
+
+async function sendRoleChangedEmail({ user, changedBy, team, previousRole }) {
+  return sendMail({ to: user.email, ...templates.roleChanged({ user, changedBy, team, previousRole }) });
 }
 
 async function sendTestEmail({ user, to }) {
@@ -239,9 +265,13 @@ module.exports = {
   sendTaskCreatedEmail,
   sendTaskCompletedEmail,
   sendTaskCommentEmail,
-  sendWelcomeEmail,
-  sendPasswordChangedEmail,
+  sendTaskRequestEmail,
+  sendTaskUpdatedEmail,
+  sendLoginCodeEmail,
+  sendInviteEmail,
+  sendRoleChangedEmail,
   sendTestEmail,
+  providerName: () => detectProvider(),
   buildTaskEmailHtml,
   status,
   setTransporter,

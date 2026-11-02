@@ -33,7 +33,24 @@ export function useProjects() {
   return { projects, refresh };
 }
 
+let departmentsCache = null;
+
+// Teams (departments), with their heads.
+export function useDepartments() {
+  const [departments, setDepartments] = useState(departmentsCache || []);
+  const refresh = async () => {
+    departmentsCache = await usersApi.listDepartments();
+    setDepartments(departmentsCache);
+    return departmentsCache;
+  };
+  useEffect(() => {
+    if (!departmentsCache) refresh().catch(() => {});
+  }, []);
+  return { departments, refresh };
+}
+
 export function invalidateDirectory() {
   usersCache = null;
   projectsCache = null;
+  departmentsCache = null;
 }

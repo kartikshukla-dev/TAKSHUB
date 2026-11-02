@@ -6,16 +6,16 @@ import { AuthProvider } from '../context/AuthContext';
 import * as authApi from '../api/auth';
 
 vi.mock('../api/auth', () => ({
-  login: vi.fn(),
-  register: vi.fn(),
+  requestOtp: vi.fn(),
+  verifyOtp: vi.fn(),
   fetchMe: vi.fn(),
   getProviders: vi.fn().mockResolvedValue({ google: true }),
   googleLoginUrl: () => 'http://localhost:5000/api/auth/google',
 }));
 
-function renderLogin() {
+function renderLogin(path = '/login') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <AuthProvider>
         <Login />
       </AuthProvider>
@@ -23,32 +23,46 @@ function renderLogin() {
   );
 }
 
-describe('Login page', () => {
+describe('Login page (email + one-time code)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
   });
 
-  it('requires email and password before submitting', () => {
+  it('asks for an email and has no password field', () => {
     renderLogin();
-    const emailInput = screen.getByLabelText('Email');
-    const passwordInput = screen.getByLabelText('Password');
-    expect(emailInput).toBeRequired();
-    expect(passwordInput).toBeRequired();
+    expect(screen.getByLabelText('Email')).toBeRequired();
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
   });
 
-  it('calls the login API with entered credentials and shows an error on failure', async () => {
-    authApi.login.mockRejectedValue({ response: { data: { message: 'Invalid email or password' } } });
+  it('sends a code, then signs in with it', async () => {
+    authApi.requestOtp.mockResolvedValue({ message: 'Code sent' });
+    authApi.verifyOtp.mockResolvedValue({ token: 't', user: { _id: 'u1', name: 'A', role: 'member' } });
+    renderLogin();
 
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.com' } });
+    fireEvent.click(screen.getByText('Send code'));
+    await waitFor(() => expect(authApi.requestOtp).toHaveBeenCalledWith('user@example.com'));
+
+    fireEvent.change(await screen.findByLabelText('Sign-in code'), { target: { value: '12a3456' } });
+    fireEvent.click(screen.getByText('Sign in'));
+    await waitFor(() => expect(authApi.verifyOtp).toHaveBeenCalledWith('user@example.com', '123456'));
+  });
+
+  it('shows the server error for a wrong code', async () => {
+    authApi.requestOtp.mockResolvedValue({});
+    authApi.verifyOtp.mockRejectedValue({ response: { data: { message: 'That code is not right' } } });
     renderLogin();
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.com' } });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrongpass' } });
-    fireEvent.click(screen.getByText('Log in'));
+    fireEvent.click(screen.getByText('Send code'));
+    fireEvent.change(await screen.findByLabelText('Sign-in code'), { target: { value: '000000' } });
+    fireEvent.click(screen.getByText('Sign in'));
+    expect(await screen.findByText('That code is not right')).toBeInTheDocument();
+  });
 
-    await waitFor(() => expect(authApi.login).toHaveBeenCalledWith({
-      email: 'user@example.com',
-      password: 'wrongpass',
-    }));
-    await waitFor(() => expect(screen.getByText('Invalid email or password')).toBeInTheDocument());
+  it('pre-fills the email from an invite link and explains Google errors', () => {
+    renderLogin('/login?email=new%40example.com&error=google_not_invited');
+    expect(screen.getByLabelText('Email')).toHaveValue('new@example.com');
+    expect(screen.getByText(/has not been invited/)).toBeInTheDocument();
   });
 });

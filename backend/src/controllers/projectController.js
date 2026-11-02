@@ -2,7 +2,7 @@ const Project = require('../models/Project');
 const Task = require('../models/Task');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
-const { visibleProjectFilter, assertCanViewProject } = require('../utils/access');
+const { visibleProjectFilter, visibleTaskFilter, assertCanViewProject } = require('../utils/access');
 const { USER_FIELDS, startOfDay } = require('../utils/taskQuery');
 const { buildFeed } = require('./activityController');
 
@@ -87,12 +87,30 @@ const getProject = catchAsync(async (req, res) => {
   if (!project) throw new ApiError(404, 'Project not found');
   assertCanViewProject(req.user, project);
   const [withCounts] = await withProgress([project]);
+  if (project.system && req.user.role !== 'admin') {
+    // Only count the requests this person can see.
+    const base = { $and: [{ project: project._id }, await visibleTaskFilter(req.user)] };
+    withCounts.taskCount = await Task.countDocuments(base);
+    withCounts.doneCount = await Task.countDocuments({ $and: [...base.$and, { status: 'done' }] });
+    withCounts.overdueCount = 0;
+  }
   res.status(200).json({ project: withCounts });
 });
 
-const updateProject = catchAsync(async (req, res) => {
+// Team Heads may only manage projects they belong to; the built-in
+// "Team requests" project is Super Admin only.
+async function loadEditable(req) {
   const project = await Project.findById(req.params.id);
   if (!project) throw new ApiError(404, 'Project not found');
+  if (req.user.role !== 'admin') {
+    if (project.system) throw new ApiError(403, 'Only a Super Admin can change this project');
+    assertCanViewProject(req.user, project);
+  }
+  return project;
+}
+
+const updateProject = catchAsync(async (req, res) => {
+  const project = await loadEditable(req);
 
   const { name, description, status, visibility, owner } = req.body;
   if (name !== undefined) project.name = name;
@@ -125,8 +143,7 @@ const addMember = catchAsync(async (req, res) => {
   const { userId } = req.body;
   if (!userId) throw new ApiError(400, 'userId is required');
 
-  const project = await Project.findById(req.params.id);
-  if (!project) throw new ApiError(404, 'Project not found');
+  const project = await loadEditable(req);
 
   if (!project.members.some((m) => m.toString() === userId)) {
     project.members.push(userId);
@@ -138,8 +155,7 @@ const addMember = catchAsync(async (req, res) => {
 });
 
 const removeMember = catchAsync(async (req, res) => {
-  const project = await Project.findById(req.params.id);
-  if (!project) throw new ApiError(404, 'Project not found');
+  const project = await loadEditable(req);
   project.members = project.members.filter((m) => m.toString() !== req.params.userId);
   if (project.owner && project.owner.toString() === req.params.userId) project.owner = null;
   await project.save();
@@ -155,7 +171,9 @@ const getActivityFeed = catchAsync(async (req, res) => {
   assertCanViewProject(req.user, project);
 
   const limit = Math.min(Number(req.query.limit) || 50, 200);
-  const feed = await buildFeed({ project: project._id }, limit);
+  // In "Team requests" people only see activity on tasks they can see.
+  const filter = project.system ? { $and: [{ project: project._id }, await visibleTaskFilter(req.user)] } : { project: project._id };
+  const feed = await buildFeed(filter, limit);
   res.status(200).json({ feed });
 });
 

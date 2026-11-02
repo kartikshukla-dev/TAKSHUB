@@ -26,6 +26,11 @@ export default function TaskTable({ tasks, onOpenTask, showProject = true }) {
                 <td className="col-key mono">{taskKey(t)}</td>
                 <td className="col-title">
                   <span className="cell-title">{t.title}</span>
+                  {t.toTeam?.name && (
+                    <span className="team-tag" title={t.fromTeam?.name ? `${t.fromTeam.name} → ${t.toTeam.name}` : t.toTeam.name}>
+                      → {t.toTeam.name}
+                    </span>
+                  )}
                   {t.blocked && (
                     <span className="blocked-tag">
                       <Icon name="ban" size={12} /> Blocked

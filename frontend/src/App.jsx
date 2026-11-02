@@ -2,7 +2,10 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppShell from './components/AppShell';
 import Login from './pages/Login';
-import Register from './pages/Register';
+import Users from './pages/Users';
+import TeamLeads from './pages/TeamLeads';
+import TeamDetail from './pages/TeamDetail';
+import { useAuth } from './context/AuthContext';
 import OAuthCallback from './pages/OAuthCallback';
 import Dashboard from './pages/Dashboard';
 import TasksPage from './pages/TasksPage';
@@ -17,11 +20,18 @@ import Activity from './pages/Activity';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 
+// Pages only Super Admins can open.
+function AdminOnly({ children }) {
+  const { isAdmin } = useAuth();
+  return isAdmin ? children : <Navigate to="/dashboard" replace />;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      {/* No self sign-up: people join through an invite. */}
+      <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route path="/oauth/callback" element={<OAuthCallback />} />
       <Route
         element={
@@ -45,6 +55,9 @@ export default function App() {
         <Route path="/activity" element={<Activity />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/teams/:id" element={<TeamDetail />} />
+        <Route path="/team-leads" element={<AdminOnly><TeamLeads /></AdminOnly>} />
+        <Route path="/users" element={<AdminOnly><Users /></AdminOnly>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>

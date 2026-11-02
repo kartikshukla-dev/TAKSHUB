@@ -1,9 +1,20 @@
+const crypto = require('crypto');
 const passport = require('passport');
-const User = require('../models/User');
+const LoginCode = require('../models/LoginCode');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { signToken } = require('../utils/jwt');
-const { sendWelcomeEmail } = require('../services/emailService');
+const { sendLoginCodeEmail } = require('../services/emailService');
+const { findSignInUser, markSignedIn } = require('../services/accountService');
+
+const CODE_TTL_MIN = 10;
+const RESEND_AFTER_MS = 45 * 1000;
+const MAX_ATTEMPTS = 5;
+const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Same response whether or not the email exists, so the form can't be used
+// to discover who has an account.
+const GENERIC_SENT = 'If this email has access to TaskHub, a sign-in code is on its way.';
 
 function googleConfigured() {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -13,46 +24,81 @@ function frontendUrl() {
   return (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
 }
 
-const register = catchAsync(async (req, res) => {
-  const { name, email, password, role } = req.body;
+function hashCode(email, code) {
+  return crypto
+    .createHmac('sha256', process.env.JWT_SECRET || 'dev-secret')
+    .update(`${email}:${code}`)
+    .digest('hex');
+}
 
-  if (!name || !email || !password) {
-    throw new ApiError(400, 'name, email and password are required');
+function safeEqual(a, b) {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+
+function normalizeEmail(raw) {
+  const email = String(raw || '').trim().toLowerCase();
+  if (!EMAIL_RX.test(email)) throw new ApiError(400, 'Enter a valid email address');
+  return email;
+}
+
+// POST /api/auth/otp/request { email }
+const requestCode = catchAsync(async (req, res) => {
+  const email = normalizeEmail(req.body.email);
+
+  const recent = await LoginCode.findOne({ email }).sort({ createdAt: -1 });
+  if (recent && Date.now() - recent.createdAt.getTime() < RESEND_AFTER_MS) {
+    const wait = Math.ceil((RESEND_AFTER_MS - (Date.now() - recent.createdAt.getTime())) / 1000);
+    throw new ApiError(429, `Please wait ${wait}s before asking for another code`);
   }
-  if (password.length < 6) {
-    throw new ApiError(400, 'password must be at least 6 characters');
+
+  const user = await findSignInUser(email);
+  if (!user || user.status === 'disabled') {
+    return res.status(200).json({ message: GENERIC_SENT });
   }
 
-  const existing = await User.findOne({ email: email.toLowerCase() });
-  if (existing) {
-    throw new ApiError(409, 'Email already registered');
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  await LoginCode.deleteMany({ email });
+  await LoginCode.create({ email, codeHash: hashCode(email, code), expiresAt: new Date(Date.now() + CODE_TTL_MIN * 60000) });
+
+  let sent = false;
+  try {
+    sent = await sendLoginCodeEmail({ user, code });
+  } catch (err) {
+    console.error('[auth] could not email login code:', err.message);
+    throw new ApiError(502, 'Could not send the code email. Check the email settings on the server.');
   }
+  // With no email provider configured, print the code so local demos work.
+  if (!sent) console.log(`[auth] Sign-in code for ${email}: ${code} (no email provider configured)`);
 
-  const user = await User.create({
-    name,
-    email,
-    passwordHash: password,
-    role: ['admin', 'manager'].includes(role) ? role : 'member',
-  });
-
-  const token = signToken(user);
-  sendWelcomeEmail({ user }).catch((err) => console.error('[email] welcome failed:', err.message));
-  res.status(201).json({ token, user: user.toSafeJSON() });
+  return res.status(200).json({ message: GENERIC_SENT });
 });
 
-const login = catchAsync(async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    throw new ApiError(400, 'email and password are required');
+// POST /api/auth/otp/verify { email, code }
+const verifyCode = catchAsync(async (req, res) => {
+  const email = normalizeEmail(req.body.email);
+  const code = String(req.body.code || '').replace(/\D/g, '');
+  if (code.length !== 6) throw new ApiError(400, 'Enter the 6-digit code');
+
+  const record = await LoginCode.findOne({ email }).sort({ createdAt: -1 });
+  if (!record || record.expiresAt < new Date()) throw new ApiError(400, 'This code has expired. Ask for a new one.');
+  if (record.attempts >= MAX_ATTEMPTS) {
+    await record.deleteOne();
+    throw new ApiError(429, 'Too many wrong attempts. Ask for a new code.');
+  }
+  if (!safeEqual(record.codeHash, hashCode(email, code))) {
+    record.attempts += 1;
+    await record.save();
+    throw new ApiError(400, 'That code is not right. Check the email and try again.');
   }
 
-  const user = await User.findOne({ email: email.toLowerCase() }).select('+passwordHash');
-  if (!user || !(await user.comparePassword(password))) {
-    throw new ApiError(401, 'Invalid email or password');
-  }
-
-  const token = signToken(user);
-  res.status(200).json({ token, user: user.toSafeJSON() });
+  await record.deleteOne();
+  const user = await findSignInUser(email);
+  if (!user || user.status === 'disabled') throw new ApiError(403, 'This account does not have access');
+  await markSignedIn(user);
+  await user.populate('department', 'name');
+  res.status(200).json({ token: signToken(user), user: user.toSafeJSON() });
 });
 
 const me = catchAsync(async (req, res) => {
@@ -63,39 +109,38 @@ const me = catchAsync(async (req, res) => {
 // GET /api/auth/providers : lets the login page hide the Google button
 // when the server has no Google credentials.
 const providers = (req, res) => {
-  res.status(200).json({ google: googleConfigured() });
+  res.status(200).json({ google: googleConfigured(), otp: true });
 };
 
 function loginError(res, code) {
   res.redirect(`${frontendUrl()}/login?error=${encodeURIComponent(code)}`);
 }
 
-// Kicks off the Google OAuth redirect.
 const googleAuth = (req, res, next) => {
   if (!googleConfigured()) return loginError(res, 'google_not_configured');
-  return passport.authenticate('google', {
-    scope: ['profile', 'email'],
-    session: false,
-    prompt: 'select_account',
-  })(req, res, next);
+  return passport.authenticate('google', { scope: ['profile', 'email'], session: false, prompt: 'select_account' })(req, res, next);
 };
 
-// Handles the Google OAuth callback, issues a JWT and hands it to the
-// frontend in the URL fragment (fragments are never sent to servers or
-// written to access logs, unlike query strings).
+// Hands the JWT to the frontend in the URL fragment, which browsers never
+// send to servers or write to access logs.
 const googleCallback = (req, res, next) => {
   if (!googleConfigured()) return loginError(res, 'google_not_configured');
-  return passport.authenticate('google', { session: false }, (err, user) => {
+  return passport.authenticate('google', { session: false }, async (err, user) => {
     if (err) {
-      console.error('[auth] Google login failed:', err.message);
-      return loginError(res, err.code === 'NO_EMAIL' ? 'google_no_email' : 'google_failed');
+      const known = { NO_EMAIL: 'google_no_email', NOT_INVITED: 'google_not_invited', DISABLED: 'google_disabled' };
+      if (!known[err.code]) console.error('[auth] Google login failed:', err.message);
+      return loginError(res, known[err.code] || 'google_failed');
     }
     if (!user) return loginError(res, 'google_cancelled');
-    const token = signToken(user);
-    return res.redirect(`${frontendUrl()}/oauth/callback#token=${encodeURIComponent(token)}`);
+    try {
+      await markSignedIn(user);
+    } catch (e) {
+      return next(e);
+    }
+    return res.redirect(`${frontendUrl()}/oauth/callback#token=${encodeURIComponent(signToken(user))}`);
   })(req, res, next);
 };
 
 const googleFailure = (req, res) => loginError(res, 'google_failed');
 
-module.exports = { register, login, me, providers, googleAuth, googleCallback, googleFailure };
+module.exports = { requestCode, verifyCode, me, providers, googleAuth, googleCallback, googleFailure };

@@ -45,6 +45,11 @@ const taskSchema = new mongoose.Schema(
     number: { type: Number, default: null },
     project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
     assignee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    // Team that raised the task (the reporter's department at creation) and
+    // the team it was sent to. When toTeam is set, only that team's head
+    // (or a Super Admin) sets the deadline and assignee.
+    fromTeam: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', default: null, index: true },
+    toTeam: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', default: null, index: true },
     reporter: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     labels: [{ type: String, trim: true }],
     dueDate: { type: Date, default: null },
@@ -57,7 +62,7 @@ const taskSchema = new mongoose.Schema(
 );
 
 // Fields we track in the activity log when changed via the "diff & update" helper.
-taskSchema.statics.TRACKED_FIELDS = ['status', 'priority', 'assignee', 'labels', 'dueDate', 'title', 'blocked'];
+taskSchema.statics.TRACKED_FIELDS = ['status', 'priority', 'assignee', 'labels', 'dueDate', 'title', 'blocked', 'toTeam'];
 taskSchema.statics.STATUSES = STATUSES;
 taskSchema.statics.PRIORITIES = PRIORITIES;
 

@@ -90,62 +90,12 @@ function PushCard() {
           <strong>Notifications on this device</strong>
           <span className="muted small">
             Get a pop-up on this computer when someone messages you, assigns you a task, or comments on or changes a task
-            you&apos;re on. Works while Oncare is open in a tab.
+            you&apos;re on. Works while TaskHub is open in a tab.
           </span>
         </div>
         <Toggle checked={pushEnabled} onChange={change} label="Notifications on this device" disabled={!supported} />
       </div>
       {!supported && <p className="muted small">This browser doesn&apos;t support notifications.</p>}
-    </Card>
-  );
-}
-
-function PasswordCard() {
-  const [current, setCurrent] = useState('');
-  const [next, setNext] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [status, setStatus] = useState({ type: '', text: '' });
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (next !== confirm) {
-      setStatus({ type: 'error', text: 'New passwords do not match' });
-      return;
-    }
-    try {
-      await usersApi.changePassword({ currentPassword: current, newPassword: next });
-      setCurrent('');
-      setNext('');
-      setConfirm('');
-      setStatus({ type: 'success', text: 'Password changed' });
-    } catch (err) {
-      setStatus({ type: 'error', text: err.response?.data?.message || 'Could not change password' });
-    }
-  };
-
-  return (
-    <Card title="Password">
-      <form className="form-stack form-narrow" onSubmit={submit}>
-        {status.text && <div className={`alert alert-${status.type}`}>{status.text}</div>}
-        <div className="field">
-          <label htmlFor="pw-current">Current password</label>
-          <input id="pw-current" className="input" type="password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" />
-        </div>
-        <div className="field">
-          <label htmlFor="pw-new">New password</label>
-          <input id="pw-new" className="input" type="password" value={next} onChange={(e) => setNext(e.target.value)} minLength={6} required autoComplete="new-password" />
-          <span className="field-hint">At least 6 characters.</span>
-        </div>
-        <div className="field">
-          <label htmlFor="pw-confirm">Confirm new password</label>
-          <input id="pw-confirm" className="input" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" />
-        </div>
-        <div>
-          <button type="submit" className="btn btn-secondary" disabled={!next || !confirm}>
-            Change password
-          </button>
-        </div>
-      </form>
     </Card>
   );
 }
@@ -159,15 +109,17 @@ function AccessCard() {
         <dd>{WORKSPACE_NAME}</dd>
         <dt>Role</dt>
         <dd>{ROLE_LABEL[user?.role] || user?.role}</dd>
-        <dt>Department</dt>
+        <dt>Team</dt>
         <dd>{user?.department?.name || '—'}</dd>
-        <dt>Assignment policy</dt>
-        <dd>Everyone can assign tasks to anyone</dd>
+        <dt>Sign-in</dt>
+        <dd>One-time code to {user?.email}, or Google with the same email</dd>
+        <dt>Assigning team tasks</dt>
+        <dd>Only the receiving team&apos;s head (or a Super Admin) sets the deadline and assignee</dd>
         <dt>Task visibility</dt>
         <dd>
-          {user?.role === 'member'
-            ? 'Employees see tasks in their projects and tasks they are involved in'
-            : 'Admins and managers see all tasks'}
+          {user?.role === 'admin'
+            ? 'Super Admins see every task'
+            : 'Tasks your team raised or received, tasks you are on, and tasks in your projects'}
         </dd>
       </dl>
     </Card>
@@ -176,11 +128,14 @@ function AccessCard() {
 
 const PROVIDER_LABEL = { smtp: 'SMTP', resend: 'Resend API', brevo: 'Brevo API' };
 const TEMPLATE_LABEL = {
-  welcome: 'Welcome',
-  'task-assigned': 'Task assigned',
-  'task-completed': 'Task completed',
-  'task-comment': 'New comment',
-  'password-changed': 'Password changed',
+  'login-code': 'Sign-in code',
+  invite: 'Invite',
+  'role-changed': 'Role changed',
+  'team-request': 'Team request',
+  'task-assigned': 'Assigned',
+  'task-updated': 'Deadline / update',
+  'task-completed': 'Completed',
+  'task-comment': 'Comment',
 };
 
 // Admin only: shows which email provider the server uses, sends a test
@@ -191,7 +146,7 @@ function EmailDeliveryCard() {
   const [to, setTo] = useState(user?.email || '');
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState({ type: '', text: '' });
-  const [template, setTemplate] = useState('task-assigned');
+  const [template, setTemplate] = useState('team-request');
   const [preview, setPreview] = useState(null);
 
   useEffect(() => {
@@ -267,7 +222,6 @@ export default function Settings() {
       <PageHeader title="Settings" subtitle="Your profile, password and notification preferences." />
       <ProfileCard />
       <PushCard />
-      <PasswordCard />
       {isAdmin && <EmailDeliveryCard />}
       <AccessCard />
     </div>

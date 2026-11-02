@@ -5,7 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import { LiveProvider, useLive } from '../context/LiveContext';
 import { TaskUiProvider, useTaskUi } from '../context/TaskUiContext';
 import { invalidateDirectory } from '../hooks/useDirectory';
-import { ROLE_LABEL, WORKSPACE_NAME } from '../utils/format';
+import { ROLE_LABEL, WORKSPACE_NAME, APP_NAME } from '../utils/format';
 import Icon, { BrandMark } from './Icon';
 import { Avatar } from './ui';
 import CommandPalette from './CommandPalette';
@@ -44,12 +44,19 @@ function NavItem({ item, collapsed, badgeCount }) {
 
 function Sidebar({ collapsed, onToggle }) {
   const { chatUnread } = useLive();
+  const { isAdmin, isHead, departmentId } = useAuth();
+  // Super Admin: Team Leads + Users. Team Head: their own team page.
+  const manage = [
+    ...(isAdmin ? [{ to: '/team-leads', label: 'Team Leads', icon: 'building' }] : []),
+    ...(isHead && departmentId ? [{ to: `/teams/${departmentId}`, label: 'My Team', icon: 'building' }] : []),
+    ...(isAdmin ? [{ to: '/users', label: 'Users', icon: 'userCircle' }] : []),
+  ];
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-head">
         <NavLink to="/dashboard" className="brand">
           <BrandMark size={28} />
-          {!collapsed && <span className="brand-name">{WORKSPACE_NAME}</span>}
+          {!collapsed && <span className="brand-name">{APP_NAME}</span>}
         </NavLink>
         <button type="button" className="icon-btn" onClick={onToggle} aria-label="Toggle sidebar">
           <Icon name={collapsed ? 'panelRight' : 'panelLeft'} size={16} />
@@ -67,6 +74,14 @@ function Sidebar({ collapsed, onToggle }) {
             <NavItem key={item.to} item={item} collapsed={collapsed} />
           ))}
         </div>
+        {manage.length > 0 && (
+          <div className="nav-group">
+            {!collapsed && <div className="nav-heading">{isAdmin ? 'Super Admin' : 'Team Head'}</div>}
+            {manage.map((item) => (
+              <NavItem key={item.to} item={item} collapsed={collapsed} />
+            ))}
+          </div>
+        )}
         <div className="nav-group">
           <NavItem item={{ to: '/settings', label: 'Settings', icon: 'settings' }} collapsed={collapsed} />
         </div>

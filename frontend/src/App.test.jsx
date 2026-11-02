@@ -6,8 +6,8 @@ import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 
 vi.mock('./api/auth', () => ({
-  login: vi.fn(),
-  register: vi.fn(),
+  requestOtp: vi.fn(),
+  verifyOtp: vi.fn(),
   fetchMe: vi.fn().mockRejectedValue(new Error('no session')),
   getProviders: vi.fn().mockResolvedValue({ google: false }),
   googleLoginUrl: () => 'http://localhost:5000/api/auth/google',
@@ -35,8 +35,8 @@ describe('App routing', () => {
     expect(await screen.findByText('Welcome back')).toBeInTheDocument();
   });
 
-  it('renders the register page at /register', async () => {
+  it('sends the old /register link to login (invite-only)', async () => {
     renderAt('/register');
-    expect(await screen.findByText("Create your account")).toBeInTheDocument();
+    expect(await screen.findByText('Welcome back')).toBeInTheDocument();
   });
 });

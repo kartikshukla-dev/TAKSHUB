@@ -22,17 +22,29 @@ const {
 const { listNotifications, markRead, markAllRead } = require('../controllers/notificationController');
 const { search } = require('../controllers/searchController');
 const emailAdmin = require('../controllers/emailController');
+const { createTask } = require('../controllers/taskController');
+const { invite, resendInvite, revokeInvite } = require('../controllers/userController');
+const { listTeams, getTeam } = require('../controllers/teamController');
 
 const router = express.Router();
 const admin = requireRole('admin');
 
 // Auth only on this router's own paths, so unknown /api routes still 404.
 router.use(
-  ['/tasks', '/stats', '/activity', '/departments', '/todos', '/chat', '/notifications', '/search', '/admin'],
+  ['/tasks', '/stats', '/activity', '/departments', '/todos', '/chat', '/notifications', '/search', '/admin', '/teams', '/invites'],
   requireAuth
 );
 
 router.get('/tasks', listAllTasks);
+// Raise a task to a team, with or without a project.
+router.post('/tasks', createTask);
+
+router.get('/teams', listTeams);
+router.get('/teams/:id', getTeam);
+
+router.post('/invites', invite);
+router.post('/invites/:id/resend', resendInvite);
+router.delete('/invites/:id', revokeInvite);
 
 router.get('/stats/dashboard', dashboard);
 router.get('/stats/reports', reports);

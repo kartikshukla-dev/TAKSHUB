@@ -3,8 +3,8 @@ const Task = require('../models/Task');
 const Project = require('../models/Project');
 const { visibleTaskFilter } = require('./access');
 
-const USER_FIELDS = 'name email avatar jobTitle role';
-const PROJECT_FIELDS = 'name key status visibility members';
+const USER_FIELDS = 'name email avatar jobTitle role department';
+const PROJECT_FIELDS = 'name key status visibility members system';
 
 const PRIORITY_RANK = { urgent: 0, high: 1, medium: 2, low: 3 };
 
@@ -61,6 +61,13 @@ async function buildTaskFilter(user, query = {}) {
     if (id) and.push({ reporter: id });
   }
   if (query.involved === 'me') and.push({ $or: [{ assignee: user._id }, { reporter: user._id }] });
+  // team=<deptId>: tasks raised by, sent to, or assigned to someone in that team.
+  if (isId(query.team)) {
+    const teamId = new mongoose.Types.ObjectId(query.team);
+    const members = await mongoose.model('User').find({ department: teamId }).select('_id');
+    and.push({ $or: [{ toTeam: teamId }, { fromTeam: teamId }, { assignee: { $in: members.map((m) => m._id) } }] });
+  }
+  if (isId(query.to_team)) and.push({ toTeam: new mongoose.Types.ObjectId(query.to_team) });
   if (isId(query.project)) and.push({ project: new mongoose.Types.ObjectId(query.project) });
 
   const statuses = list(query.status).filter((s) => Task.STATUSES.includes(s));
@@ -152,6 +159,8 @@ const TASK_POPULATE = [
   { path: 'assignee', select: USER_FIELDS },
   { path: 'reporter', select: USER_FIELDS },
   { path: 'project', select: PROJECT_FIELDS },
+  { path: 'fromTeam', select: 'name' },
+  { path: 'toTeam', select: 'name' },
 ];
 
 module.exports = {

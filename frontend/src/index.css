@@ -281,6 +281,12 @@ kbd {
   gap: 8px;
 }
 
+.brand-mark {
+  display: block;
+  flex-shrink: 0;
+  border-radius: 7px;
+}
+
 .brand:hover {
   text-decoration: none;
 }
@@ -2974,6 +2980,133 @@ a.bar-row:hover .cell-person {
 
 .btn-google {
   color: var(--foreground);
+}
+
+.input-code {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  letter-spacing: 0.4em;
+  text-align: center;
+  height: 48px;
+}
+
+.team-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  margin-left: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--highlight) 14%, transparent);
+  color: color-mix(in srgb, var(--highlight) 70%, var(--foreground));
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.task-card-top .team-tag {
+  margin-left: 0;
+}
+
+.chip-team {
+  background: color-mix(in srgb, var(--highlight) 14%, transparent);
+  border-color: transparent;
+  color: color-mix(in srgb, var(--highlight) 70%, var(--foreground));
+}
+
+.route-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  color: var(--muted-foreground);
+}
+
+.hint-box {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--highlight) 10%, transparent);
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.field-span {
+  grid-column: 1 / -1;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.team-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--foreground);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+}
+
+.team-card:hover {
+  text-decoration: none;
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  box-shadow: var(--shadow-md);
+}
+
+.team-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.team-head-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.team-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.team-stats div {
+  display: flex;
+  flex-direction: column;
+}
+
+.team-stats strong {
+  font-size: 17px;
+}
+
+.status-invited {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-color: transparent;
+}
+
+.status-disabled {
+  background: var(--muted);
+  color: var(--muted-foreground);
+  border-color: transparent;
+}
+
+.select-inline {
+  width: auto;
+  min-width: 130px;
+  height: 30px;
+  font-size: 13px;
 }
 
 .auth-divider {

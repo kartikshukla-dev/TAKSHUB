@@ -1,6 +1,6 @@
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('../models/User');
-const { sendWelcomeEmail } = require('../services/emailService');
+const { findSignInUser } = require('../services/accountService');
 
 /**
  * Registers the Google OAuth2 strategy with Passport.
@@ -35,35 +35,32 @@ module.exports = function configurePassport(passport) {
   );
 };
 
+function fail(code, message) {
+  const err = new Error(message);
+  err.code = code;
+  return err;
+}
+
+// Invite-only: Google can sign in an account that already exists (matched
+// by Google id, then by email) or a SUPERADMIN_EMAIL address. Anyone else
+// is turned away with NOT_INVITED.
 async function findOrCreateGoogleUser(profile) {
   const rawEmail = profile.emails && profile.emails[0] && profile.emails[0].value;
   const email = rawEmail ? rawEmail.trim().toLowerCase() : null;
+  const photo = (profile.photos && profile.photos[0] && profile.photos[0].value) || '';
 
   let user = await User.findOne({ googleId: profile.id });
-  if (user) return user;
-
-  if (!email) {
-    const err = new Error('Google did not share an email address for this account');
-    err.code = 'NO_EMAIL';
-    throw err;
-  }
-
-  // Link Google to an existing email/password account with the same email.
-  user = await User.findOne({ email });
-  if (user) {
+  if (!user) {
+    if (!email) throw fail('NO_EMAIL', 'Google did not share an email address for this account');
+    user = await findSignInUser(email, { name: profile.displayName || undefined, avatar: photo });
+    if (!user) throw fail('NOT_INVITED', `${email} has not been invited`);
     user.googleId = profile.id;
-    if (!user.avatar && profile.photos && profile.photos[0]) user.avatar = profile.photos[0].value;
+    if (!user.avatar && photo) user.avatar = photo;
+    // Invited accounts get their real Google name on first sign-in.
+    if (user.status === 'invited' && profile.displayName) user.name = profile.displayName;
     await user.save();
-    return user;
   }
-
-  user = await User.create({
-    name: profile.displayName || email.split('@')[0],
-    email,
-    googleId: profile.id,
-    avatar: (profile.photos && profile.photos[0] && profile.photos[0].value) || '',
-  });
-  sendWelcomeEmail({ user, viaGoogle: true }).catch((e) => console.error('[email] welcome failed:', e.message));
+  if (user.status === 'disabled') throw fail('DISABLED', 'This account is disabled');
   return user;
 }
 

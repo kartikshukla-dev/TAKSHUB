@@ -4,20 +4,13 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_secret';
 const request = require('supertest');
 const { startTestDb, stopTestDb, clearTestDb } = require('./setupTestDb');
 const createApp = require('../src/app');
+const { createUser } = require('./helpers');
 const emailService = require('../src/services/emailService');
 
 let app;
 
 async function registerAndLogin(overrides = {}) {
-  const payload = {
-    name: 'User',
-    email: `user${Date.now()}${Math.random()}@example.com`,
-    password: 'password123',
-    role: 'admin',
-    ...overrides,
-  };
-  const res = await request(app).post('/api/auth/register').send(payload);
-  return { token: res.body.token, user: res.body.user };
+  return createUser({ role: 'admin', ...overrides });
 }
 
 async function createProject(token) {

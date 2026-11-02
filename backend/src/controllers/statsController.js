@@ -195,9 +195,12 @@ const reports = catchAsync(async (req, res) => {
   const days = rangeDays(req.query);
   const today = startOfDay();
   const from = new Date(today.getTime() - (days - 1) * DAY);
+  // Super Admin: whole workspace. Team Head: everything their team can see.
+  // Member: tasks they're involved in.
   const staff = isStaff(req.user);
+  const head = req.user.role === 'manager';
 
-  const tasks = await scopedTasks(req.user, { personal: !staff });
+  const tasks = await scopedTasks(req.user, { personal: !staff && !head });
   const open = tasks.filter(isOpen);
   const completedInRange = tasks.filter((t) => t.completedAt && new Date(t.completedAt) >= from);
 
@@ -213,7 +216,7 @@ const reports = catchAsync(async (req, res) => {
 
   res.status(200).json({
     days,
-    scope: staff ? 'workspace' : 'personal',
+    scope: staff ? 'workspace' : head ? 'team' : 'personal',
     cards: {
       created: tasks.filter((t) => new Date(t.createdAt) >= from).length,
       completed: completedInRange.length,

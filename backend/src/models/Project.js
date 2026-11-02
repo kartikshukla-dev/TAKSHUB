@@ -24,6 +24,9 @@ const projectSchema = new mongoose.Schema(
     visibility: { type: String, enum: ['private', 'workspace'], default: 'private' },
     // Running counter used to give tasks human-readable ids like ENG-12.
     taskSeq: { type: Number, default: 0 },
+    // The built-in "Team requests" project that holds tasks raised to a team
+    // without a project. Its tasks are visible by team, not by membership.
+    system: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

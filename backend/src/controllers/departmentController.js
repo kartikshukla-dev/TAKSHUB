@@ -3,15 +3,21 @@ const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 
+// Teams with member counts and their heads (Team Heads = role 'manager').
 const listDepartments = catchAsync(async (req, res) => {
   const departments = await Department.find().sort('name').lean();
-  const counts = await User.aggregate([
-    { $match: { department: { $ne: null } } },
-    { $group: { _id: '$department', count: { $sum: 1 } } },
-  ]);
-  const byId = new Map(counts.map((c) => [c._id.toString(), c.count]));
+  const people = await User.find({ department: { $ne: null }, status: { $ne: 'disabled' } })
+    .select('name role department')
+    .lean();
   res.status(200).json({
-    departments: departments.map((d) => ({ ...d, memberCount: byId.get(d._id.toString()) || 0 })),
+    departments: departments.map((d) => {
+      const mine = people.filter((p) => String(p.department) === String(d._id));
+      return {
+        ...d,
+        memberCount: mine.length,
+        heads: mine.filter((p) => p.role === 'manager').map((p) => ({ _id: p._id, name: p.name })),
+      };
+    }),
   });
 });
 

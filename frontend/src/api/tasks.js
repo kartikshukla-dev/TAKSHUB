@@ -9,8 +9,12 @@ export const listTasks = (projectId) =>
 export const getTask = (projectId, taskId) =>
   apiClient.get(`/projects/${projectId}/tasks/${taskId}`).then((r) => r.data.task);
 
+// Without a project the task goes to the built-in "Team requests" project
+// (payload.toTeam is then required by the server).
 export const createTask = (projectId, payload) =>
-  apiClient.post(`/projects/${projectId}/tasks`, payload).then((r) => r.data.task);
+  (projectId ? apiClient.post(`/projects/${projectId}/tasks`, payload) : apiClient.post('/tasks', payload)).then(
+    (r) => r.data.task
+  );
 
 export const updateTask = (projectId, taskId, payload) =>
   apiClient.patch(`/projects/${projectId}/tasks/${taskId}`, payload).then((r) => r.data.task);

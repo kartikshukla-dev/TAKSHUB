@@ -1,7 +1,8 @@
 import apiClient from './client';
 
-export const register = (payload) => apiClient.post('/auth/register', payload).then((r) => r.data);
-export const login = (payload) => apiClient.post('/auth/login', payload).then((r) => r.data);
+// Sign-in is email + one-time code, or Google.
+export const requestOtp = (email) => apiClient.post('/auth/otp/request', { email }).then((r) => r.data);
+export const verifyOtp = (email, code) => apiClient.post('/auth/otp/verify', { email, code }).then((r) => r.data);
 export const fetchMe = () => apiClient.get('/auth/me').then((r) => r.data);
 // Which sign-in methods the server has credentials for, e.g. { google: true }.
 export const getProviders = () => apiClient.get('/auth/providers').then((r) => r.data);

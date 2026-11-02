@@ -176,13 +176,7 @@ export default function Icon({ name, size = 16, className = '', strokeWidth = 2,
   );
 }
 
-// The Oncare mark: a rounded navy tile with a leaf/drop glyph.
+// The Oncare logo (purple ribbon), served from frontend/public/logo.png.
 export function BrandMark({ size = 28 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" className="brand-mark">
-      <rect width="32" height="32" rx="8" fill="var(--primary)" />
-      <path d="M16 6c4.5 4 6.5 7.6 6.5 11a6.5 6.5 0 0 1-13 0c0-3.4 2-7 6.5-11z" fill="var(--highlight)" />
-      <path d="M16 11v14" stroke="var(--primary)" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
+  return <img src="/logo.png" width={size} height={size} alt="" aria-hidden="true" className="brand-mark" />;
 }

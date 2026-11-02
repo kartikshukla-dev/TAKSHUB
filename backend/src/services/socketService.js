@@ -20,7 +20,15 @@ function initSocket(httpServer) {
         const payload = verifyToken(token);
         socket.data.userId = payload.sub;
         socket.join(userRoom(payload.sub));
-        if (payload.role === 'admin' || payload.role === 'manager') socket.join(STAFF_ROOM);
+        if (payload.role === 'admin') socket.join(STAFF_ROOM);
+        // Team room, so task updates reach everyone in the raising and
+        // receiving teams. Looked up because the token has no department.
+        // eslint-disable-next-line global-require
+        require('../models/User')
+          .findById(payload.sub)
+          .select('department')
+          .then((u) => u && u.department && socket.join(teamRoom(u.department)))
+          .catch(() => {});
       } catch {
         // Invalid token: treat as anonymous.
       }
@@ -45,6 +53,10 @@ function userRoom(userId) {
   return `user:${userId}`;
 }
 
+function teamRoom(teamId) {
+  return `team:${teamId}`;
+}
+
 // Broadcasts an event to everyone currently viewing a given project's board.
 function emitToProject(projectId, event, payload) {
   if (!io) return;
@@ -66,7 +78,9 @@ function emitTaskEvent(project, task, event, payload) {
   (project.members || []).forEach((m) => rooms.add(userRoom(idOf(m))));
   if (task.assignee) rooms.add(userRoom(idOf(task.assignee)));
   if (task.reporter) rooms.add(userRoom(idOf(task.reporter)));
-  if (project.visibility === 'workspace') {
+  if (task.fromTeam) rooms.add(teamRoom(idOf(task.fromTeam)));
+  if (task.toTeam) rooms.add(teamRoom(idOf(task.toTeam)));
+  if (project.visibility === 'workspace' && !project.system) {
     io.emit(event, payload);
     return;
   }

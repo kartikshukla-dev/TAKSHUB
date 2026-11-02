@@ -35,6 +35,7 @@ export default function TaskCard({ task, onOpen, isCompleting = false, onComplet
     >
       <div className="task-card-top">
         <span className="task-key">{taskKey(task)}</span>
+        {task.toTeam?.name && <span className="team-tag">→ {task.toTeam.name}</span>}
         {task.blocked && (
           <span className="blocked-tag" title="Blocked">
             <Icon name="ban" size={12} /> Blocked

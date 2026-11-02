@@ -14,8 +14,16 @@ export const PRIORITIES = [
 ];
 export const PRIORITY_LABEL = Object.fromEntries(PRIORITIES.map((p) => [p.id, p.label]));
 
-export const ROLE_LABEL = { admin: 'Admin', manager: 'Manager', member: 'Employee' };
+// Stored role values: admin = Super Admin, manager = Team Head, member = Member.
+export const ROLE_LABEL = { admin: 'Super Admin', manager: 'Team Head', member: 'Member' };
+export const ROLES = [
+  { id: 'member', label: 'Member' },
+  { id: 'manager', label: 'Team Head' },
+  { id: 'admin', label: 'Super Admin' },
+];
 
+// The app is TaskHub; Oncare is the company / workspace it runs for.
+export const APP_NAME = 'TaskHub';
 export const WORKSPACE_NAME = 'Oncare';
 
 export const idOf = (v) => (v ? String(v._id || v.id || v) : '');
@@ -138,7 +146,14 @@ export function describeActivity(entry) {
     case 'assignee':
       return `${who} changed the assignee`;
     case 'dueDate':
-      return `${who} changed due date to ${val(entry.newValue)}`;
+      return entry.newValue ? `${who} set the deadline to ${val(entry.newValue)}` : `${who} removed the deadline`;
+    case 'toTeam':
+      // Stored as a team name at creation, as an id on later changes.
+      return entry.newValue
+        ? /^[a-f0-9]{24}$/i.test(String(entry.newValue))
+          ? `${who} sent it to another team`
+          : `${who} sent it to ${entry.newValue}`
+        : `${who} removed the team`;
     default:
       return `${who} changed ${entry.field} from ${val(entry.oldValue)} to ${val(entry.newValue)}`;
   }

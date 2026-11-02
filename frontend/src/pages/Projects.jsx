@@ -54,7 +54,8 @@ export default function Projects() {
     setLoading(true);
     projectsApi
       .listProjects({ status: tab })
-      .then(setProjects)
+      // The built-in "Team requests" project is reached through task lists.
+      .then((list) => setProjects(list.filter((p) => !p.system)))
       .catch(() => setError('Could not load projects'))
       .finally(() => setLoading(false));
   }, [tab]);

@@ -46,14 +46,10 @@ export function AuthProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const register = async (payload) => {
-    const data = await authApi.register(payload);
-    persistSession(data.token, data.user);
-    return data.user;
-  };
+  const requestCode = (email) => authApi.requestOtp(email);
 
-  const login = async (payload) => {
-    const data = await authApi.login(payload);
+  const verifyCode = async (email, code) => {
+    const data = await authApi.verifyOtp(email, code);
     persistSession(data.token, data.user);
     return data.user;
   };
@@ -75,9 +71,14 @@ export function AuthProvider({ children }) {
     localStorage.setItem('taskhub_user', JSON.stringify(nextUser));
   };
 
+  // admin = Super Admin, manager = Team Head.
   const isAdmin = user?.role === 'admin';
-  const isStaff = isAdmin || user?.role === 'manager';
+  const isHead = user?.role === 'manager';
+  const isStaff = isAdmin || isHead;
   const userId = user ? String(user._id || user.id) : null;
+  const departmentId = user?.department ? String(user.department._id || user.department) : null;
+  // Super Admin, or head of the given team.
+  const canManageTeam = (teamId) => isAdmin || (isHead && Boolean(teamId) && String(teamId) === departmentId);
 
   return (
     <AuthContext.Provider
@@ -86,13 +87,16 @@ export function AuthProvider({ children }) {
         userId,
         token,
         loading,
-        register,
-        login,
+        requestCode,
+        verifyCode,
         loginWithToken,
         logout,
         updateCurrentUser,
         isAdmin,
+        isHead,
         isStaff,
+        departmentId,
+        canManageTeam,
       }}
     >
       {children}

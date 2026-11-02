@@ -1,9 +1,15 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 
-// 'member' is shown as "Employee" in the UI; the stored value stays 'member'
-// so existing accounts and tokens keep working.
+// Stored role values -> what the UI shows:
+//   admin   = Super Admin (sees and manages everything, assigns roles)
+//   manager = Team Head   (head of their department: assigns its tasks, invites members)
+//   member  = Member
 const ROLES = ['admin', 'manager', 'member'];
+
+// invited  = added by an admin/head, has not signed in yet
+// active   = has signed in at least once
+// disabled = cannot sign in
+const STATUSES = ['invited', 'active', 'disabled'];
 
 const userSchema = new mongoose.Schema(
   {
@@ -15,29 +21,19 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
-    passwordHash: { type: String, select: false }, // absent for Google-only accounts
     googleId: { type: String, index: true, sparse: true },
     role: { type: String, enum: ROLES, default: 'member' },
+    status: { type: String, enum: STATUSES, default: 'active' },
     avatar: { type: String, default: '' },
     jobTitle: { type: String, default: '', trim: true },
-    department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', default: null },
+    department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', default: null, index: true },
     emailNotifications: { type: Boolean, default: true },
+    invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    invitedAt: { type: Date, default: null },
+    lastLoginAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
-
-// Hash password before saving, only when it was actually modified.
-userSchema.pre('save', async function hashPassword(next) {
-  if (!this.isModified('passwordHash') || !this.passwordHash) return next();
-  const salt = await bcrypt.genSalt(10);
-  this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
-  next();
-});
-
-userSchema.methods.comparePassword = async function comparePassword(candidate) {
-  if (!this.passwordHash) return false;
-  return bcrypt.compare(candidate, this.passwordHash);
-};
 
 userSchema.methods.toSafeJSON = function toSafeJSON() {
   return {
@@ -46,6 +42,7 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
     name: this.name,
     email: this.email,
     role: this.role,
+    status: this.status,
     avatar: this.avatar,
     jobTitle: this.jobTitle,
     department: this.department,
@@ -54,5 +51,6 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
 };
 
 userSchema.statics.ROLES = ROLES;
+userSchema.statics.STATUSES = STATUSES;
 
 module.exports = mongoose.model('User', userSchema);

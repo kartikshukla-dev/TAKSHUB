@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
 import * as tasksApi from '../api/tasks';
 import { useAuth } from '../context/AuthContext';
-import { useUsers } from '../hooks/useDirectory';
+import { useUsers, useDepartments } from '../hooks/useDirectory';
 import { emitTaskChange } from '../utils/taskEvents';
 import { STATUSES, PRIORITIES, taskKey, projectIdOf, idOf, describeActivity, formatDateTime, timeAgo } from '../utils/format';
 import { Avatar, Modal, Toggle } from './ui';
 import Icon from './Icon';
 
 export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
-  const { userId, isStaff } = useAuth();
+  const { userId, isAdmin, canManageTeam } = useAuth();
   const { users } = useUsers();
+  const { departments } = useDepartments();
   const [task, setTask] = useState(initialTask);
   const [title, setTitle] = useState(initialTask.title);
   const [description, setDescription] = useState(initialTask.description || '');
@@ -131,7 +132,15 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
     }
   };
 
-  const canDelete = isStaff || idOf(task.reporter) === userId;
+  const toTeamId = idOf(task.toTeam);
+  const fromTeamId = idOf(task.fromTeam);
+  const isReporter = idOf(task.reporter) === userId;
+  // On a team task only that team's head (or a Super Admin) plans it.
+  const canPlan = !toTeamId || canManageTeam(toTeamId);
+  const canRoute = isAdmin || isReporter || canManageTeam(toTeamId);
+  const canDelete = isAdmin || isReporter || canManageTeam(toTeamId) || canManageTeam(fromTeamId);
+  const pickable = toTeamId ? users.filter((u) => idOf(u.department) === toTeamId) : users;
+  const lockedHint = task.toTeam?.name ? `Set by the ${task.toTeam.name} head` : '';
 
   return (
     <Modal title={taskKey(task) || 'Task'} icon="listChecks" onClose={onClose} wide>
@@ -239,6 +248,31 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
         </div>
 
         <aside className="task-detail-side">
+          {(toTeamId || canRoute) && (
+            <div className="side-field">
+              <span className="field-label">Team</span>
+              {task.fromTeam?.name && (
+                <span className="route-line">
+                  <span className="chip">{task.fromTeam.name}</span>
+                  <Icon name="chevronRight" size={12} />
+                  {!toTeamId && <span className="muted small">no team</span>}
+                  {toTeamId && <span className="chip chip-team">{task.toTeam?.name}</span>}
+                </span>
+              )}
+              {canRoute ? (
+                <select className="input" value={toTeamId} onChange={(e) => patch({ toTeam: e.target.value || null })} aria-label="Send to team">
+                  <option value="">No team</option>
+                  {departments.map((d) => (
+                    <option key={d._id} value={d._id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                !task.fromTeam?.name && <span className="chip chip-team">{task.toTeam?.name}</span>
+              )}
+            </div>
+          )}
           <div className="side-field">
             <span className="field-label">Status</span>
             <select className="input" value={task.status} onChange={(e) => patch({ status: e.target.value })}>
@@ -265,9 +299,15 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
               className="input"
               value={idOf(task.assignee)}
               onChange={(e) => patch({ assignee: e.target.value || null })}
+              disabled={!canPlan}
+              title={!canPlan ? lockedHint : undefined}
             >
               <option value="">Unassigned</option>
-              {users.map((m) => (
+              {/* Keep the current assignee visible even if they moved team. */}
+              {task.assignee && !pickable.some((m) => m._id === idOf(task.assignee)) && (
+                <option value={idOf(task.assignee)}>{task.assignee.name}</option>
+              )}
+              {pickable.map((m) => (
                 <option key={m._id} value={m._id}>
                   {m.name}
                 </option>
@@ -275,13 +315,16 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
             </select>
           </div>
           <div className="side-field">
-            <span className="field-label">Due date</span>
+            <span className="field-label">Deadline</span>
             <input
               className="input"
               type="date"
               value={task.dueDate ? task.dueDate.substring(0, 10) : ''}
               onChange={(e) => patch({ dueDate: e.target.value || null })}
+              disabled={!canPlan}
+              title={!canPlan ? lockedHint : undefined}
             />
+            {!canPlan && <span className="field-hint">{lockedHint}</span>}
           </div>
           <div className="side-field">
             <span className="field-label">Labels</span>
@@ -300,7 +343,7 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
           <dl className="side-meta">
             <dt>Project</dt>
             <dd>{task.project?.name || '—'}</dd>
-            <dt>Reporter</dt>
+            <dt>Raised by</dt>
             <dd>{task.reporter?.name || '—'}</dd>
             <dt>Created</dt>
             <dd>{formatDateTime(task.createdAt)}</dd>

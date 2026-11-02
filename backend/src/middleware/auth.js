@@ -23,6 +23,9 @@ const requireAuth = catchAsync(async (req, res, next) => {
   if (!user) {
     throw new ApiError(401, 'User no longer exists');
   }
+  if (user.status === 'disabled') {
+    throw new ApiError(401, 'This account is disabled');
+  }
 
   req.user = user;
   next();

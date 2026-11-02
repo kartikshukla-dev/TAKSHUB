@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BrandMark } from '../components/Icon';
-import { WORKSPACE_NAME } from '../utils/format';
+import { WORKSPACE_NAME, APP_NAME } from '../utils/format';
 import { getProviders, googleLoginUrl } from '../api/auth';
 
 export const GOOGLE_ERRORS = {
@@ -8,6 +8,8 @@ export const GOOGLE_ERRORS = {
   google_failed: 'Google sign-in failed. Please try again.',
   google_cancelled: 'Google sign-in was cancelled.',
   google_no_email: 'Your Google account did not share an email address.',
+  google_not_invited: 'This Google account has not been invited to TaskHub. Ask your team head for an invite.',
+  google_disabled: 'This account has been disabled. Contact your Super Admin.',
 };
 
 export function AuthLayout({ children }) {
@@ -15,10 +17,10 @@ export function AuthLayout({ children }) {
     <div className="auth-page">
       <div className="auth-brand">
         <BrandMark size={28} />
-        <span className="brand-name">{WORKSPACE_NAME}</span>
+        <span className="brand-name">{APP_NAME}</span>
       </div>
       <div className="auth-card">{children}</div>
-      <p className="auth-foot">{WORKSPACE_NAME} is your company&apos;s private workspace. Use your work email.</p>
+      <p className="auth-foot">{APP_NAME} is {WORKSPACE_NAME}&apos;s private workspace. Use your work email.</p>
     </div>
   );
 }
