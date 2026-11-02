@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { BrandMark } from '../components/Icon';
 import { WORKSPACE_NAME, APP_NAME } from '../utils/format';
 import { getProviders, googleLoginUrl } from '../api/auth';
+import { useLocation } from 'react-router-dom';
+import { useEffects } from '../context/EffectsContext';
+import { INTRO_REVEAL_EVENT } from '../stage/useIntro';
 
 export const GOOGLE_ERRORS = {
   google_not_configured: 'Google sign-in is not set up on this server yet.',
@@ -12,9 +15,33 @@ export const GOOGLE_ERRORS = {
   google_disabled: 'This account has been disabled. Contact your Super Admin.',
 };
 
+// Longest wait for the background intro before the card shows anyway
+// (slow three.js chunk, WebGL failure).
+const REVEAL_FALLBACK_MS = 3500;
+
 export function AuthLayout({ children }) {
+  const { pathname } = useLocation();
+  const { quality } = useEffects();
+  const intro = pathname === '/login' && quality !== 'off';
+  const [revealed, setRevealed] = useState(false);
+
+  // The card appears the moment the intro ball bursts.
+  useEffect(() => {
+    if (!intro) return undefined;
+    setRevealed(false);
+    const reveal = () => setRevealed(true);
+    window.addEventListener(INTRO_REVEAL_EVENT, reveal);
+    const timer = setTimeout(reveal, REVEAL_FALLBACK_MS);
+    return () => {
+      window.removeEventListener(INTRO_REVEAL_EVENT, reveal);
+      clearTimeout(timer);
+    };
+  }, [intro]);
+
+  const cls = ['auth-page', intro && 'auth-intro', intro && revealed && 'is-revealed'].filter(Boolean).join(' ');
+
   return (
-    <div className="auth-page">
+    <div className={cls}>
       <div className="auth-brand">
         <BrandMark size={28} />
         <span className="brand-name">{APP_NAME}</span>

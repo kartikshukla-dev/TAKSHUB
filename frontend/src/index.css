@@ -3716,6 +3716,45 @@ body {
   transform: none !important;
 }
 
+/* ---------- Login intro: card waits for the particle ball to burst ---------- */
+.auth-intro .auth-brand,
+.auth-intro .auth-card,
+.auth-intro .auth-foot {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.auth-intro.is-revealed .auth-brand,
+.auth-intro.is-revealed .auth-card,
+.auth-intro.is-revealed .auth-foot {
+  opacity: 1;
+  pointer-events: auto;
+  animation: auth-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.auth-intro.is-revealed .auth-card {
+  animation-delay: 0.12s;
+}
+
+.auth-intro.is-revealed .auth-foot {
+  animation-delay: 0.24s;
+}
+
+@keyframes auth-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+    filter: blur(8px);
+  }
+}
+
+.reduce-effects .auth-intro .auth-brand,
+.reduce-effects .auth-intro .auth-card,
+.reduce-effects .auth-intro .auth-foot {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* ---------- Floating task preview (hover) ---------- */
 @keyframes preview-in {
   from {

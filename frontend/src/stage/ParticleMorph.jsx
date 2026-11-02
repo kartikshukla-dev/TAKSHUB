@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { makeShape } from './shapes';
+import { makeShape, makeLayout, sideOf, FACE_ON } from './shapes';
 import { pointer, onBurst } from './pointer';
 
 const vertexShader = /* glsl */ `
@@ -10,9 +10,14 @@ const vertexShader = /* glsl */ `
   uniform float uSize;
   uniform float uPixelRatio;
   uniform vec4 uBurst;
+  uniform float uSpin;
+  uniform float uTilt;
+  uniform float uScale;
+  uniform float uSplit;
   attribute vec3 aStart;
   attribute vec3 aEnd;
   attribute float aRand;
+  attribute float aSide;
   varying float vRand;
   varying float vDepth;
 
@@ -26,6 +31,15 @@ const vertexShader = /* glsl */ `
     float mid = sin(p * 3.14159);
     pos += vec3(sin(aRand * 40.0 + uTime), cos(aRand * 31.0 + uTime * 0.8), sin(aRand * 17.0 - uTime)) * mid * 0.9;
     pos += vec3(sin(uTime * 0.6 + aRand * 20.0), cos(uTime * 0.5 + aRand * 13.0), sin(uTime * 0.4 + aRand * 7.0)) * 0.05;
+
+    // Each copy spins around its own centre (around the disc normal for
+    // galaxy/ring), then discs tilt up to face the camera.
+    float sa = uSpin * (aSide < 0.0 ? 1.0 : -1.0);
+    pos.xz = mat2(cos(sa), sin(sa), -sin(sa), cos(sa)) * pos.xz;
+    pos.yz = mat2(cos(uTilt), sin(uTilt), -sin(uTilt), cos(uTilt)) * pos.yz;
+    pos *= uScale;
+    // Split layout: left copy and right copy sit either side of the centre.
+    pos.x += aSide * uSplit;
 
     vec4 mv = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mv;
@@ -63,23 +77,50 @@ const fragmentShader = /* glsl */ `
 `;
 
 const MORPH_SECONDS = 1.9;
+const TAU = Math.PI * 2;
+// Galaxy/ring are flat discs; tilt them ~70deg so they face the camera
+// with a little perspective instead of showing up as a thin line.
+const FACE_TILT = 1.22;
 
 // `dim` lowers brightness on content-heavy pages so text stays readable.
-export default function ParticleMorph({ count, shape, offset = [0, 0, 0], dpr = 1, dim = false }) {
+// `morphSeconds` sets how long the next shape change takes; `spin` off
+// eases the field back to facing the camera (used for the ribbon outline).
+// `layout="split"` draws two copies `split` units either side of centre.
+export default function ParticleMorph({
+  count,
+  shape,
+  offset = [0, 0, 0],
+  dpr = 1,
+  dim = false,
+  morphSeconds = MORPH_SECONDS,
+  spin = true,
+  layout = 'center',
+  split = 0,
+  scale = 1,
+}) {
   const ref = useRef();
   const group = useRef();
-  const state = useRef({ progress: 1, shape });
+  const state = useRef({ progress: 1, shape, layout });
+  const placed = useRef(false);
+  const live = useRef({});
+  live.current = { offset, morphSeconds, spin, dim, shape, layout, split, scale };
 
   const { geometry, material } = useMemo(() => {
     const g = new THREE.BufferGeometry();
-    const end = makeShape(shape, count);
-    const start = makeShape('sphere', count, 3);
+    const end = makeLayout(shape, count, layout);
+    // The intro ball appears fully formed instead of gathering from a sphere.
+    const start = shape === 'ball' ? end.slice() : makeShape('sphere', count, 3);
     const rand = new Float32Array(count);
-    for (let i = 0; i < count; i += 1) rand[i] = Math.random();
+    const side = new Float32Array(count);
+    for (let i = 0; i < count; i += 1) {
+      rand[i] = Math.random();
+      side[i] = sideOf(i, count);
+    }
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
     g.setAttribute('aStart', new THREE.BufferAttribute(start, 3));
     g.setAttribute('aEnd', new THREE.BufferAttribute(end, 3));
     g.setAttribute('aRand', new THREE.BufferAttribute(rand, 1));
+    g.setAttribute('aSide', new THREE.BufferAttribute(side, 1));
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 12);
 
     const m = new THREE.ShaderMaterial({
@@ -95,12 +136,17 @@ export default function ParticleMorph({ count, shape, offset = [0, 0, 0], dpr = 
         uAlpha: { value: 0.5 },
         uPixelRatio: { value: dpr },
         uBurst: { value: new THREE.Vector4(0, 0, 0, 0) },
+        uSpin: { value: 0 },
+        uTilt: { value: FACE_ON.includes(shape) ? FACE_TILT : 0 },
+        uScale: { value: scale },
+        uSplit: { value: layout === 'split' ? split : 0 },
         uColorA: { value: new THREE.Color('#7c4dff') },
         uColorB: { value: new THREE.Color('#cc66ff') },
         uColorC: { value: new THREE.Color('#7fd6ff') },
       },
     });
-    state.current = { progress: 0, shape };
+    state.current = { progress: shape === 'ball' ? 1 : 0, shape, layout };
+    m.uniforms.uProgress.value = state.current.progress;
     return { geometry: g, material: m };
     // Rebuilt only when the particle budget changes; shape changes morph.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -113,7 +159,7 @@ export default function ParticleMorph({ count, shape, offset = [0, 0, 0], dpr = 
 
   // Shape change: freeze the current blend as the new start, morph to the new end.
   useEffect(() => {
-    if (state.current.shape === shape) return;
+    if (state.current.shape === shape && state.current.layout === layout) return;
     const startAttr = geometry.getAttribute('aStart');
     const endAttr = geometry.getAttribute('aEnd');
     const randAttr = geometry.getAttribute('aRand');
@@ -126,11 +172,11 @@ export default function ParticleMorph({ count, shape, offset = [0, 0, 0], dpr = 
         startAttr.array[j] += (endAttr.array[j] - startAttr.array[j]) * p;
       }
     }
-    endAttr.array.set(makeShape(shape, count));
+    endAttr.array.set(makeLayout(shape, count, layout));
     startAttr.needsUpdate = true;
     endAttr.needsUpdate = true;
-    state.current = { progress: 0, shape };
-  }, [shape, count, geometry]);
+    state.current = { progress: 0, shape, layout };
+  }, [shape, layout, count, geometry]);
 
   useEffect(
     () =>
@@ -145,20 +191,40 @@ export default function ParticleMorph({ count, shape, offset = [0, 0, 0], dpr = 
     const dt = Math.min(delta, 0.05);
     const u = material.uniforms;
     u.uTime.value += dt;
-    state.current.progress = Math.min(1, state.current.progress + dt / MORPH_SECONDS);
+    const cfg = live.current;
+    const seconds = Math.max(0.1, cfg.morphSeconds);
+    state.current.progress = Math.min(1, state.current.progress + dt / seconds);
     u.uProgress.value = state.current.progress;
     u.uBurst.value.w *= 0.93;
-    u.uAlpha.value += ((dim ? 0.32 : 0.6) - u.uAlpha.value) * Math.min(1, dt * 2);
-    if (group.current) {
-      group.current.rotation.y += dt * 0.05;
-      group.current.rotation.x += (pointer.y * 0.25 - group.current.rotation.x) * 0.04;
-      group.current.position.x += (offset[0] + pointer.x * 0.4 - group.current.position.x) * 0.04;
-      group.current.position.y += (offset[1] - group.current.position.y) * 0.04;
+    u.uAlpha.value += ((cfg.dim ? 0.32 : 0.78) - u.uAlpha.value) * Math.min(1, dt * 2);
+    const g = group.current;
+    if (!g) return;
+    const [ox, oy, oz] = cfg.offset;
+    if (!placed.current) {
+      g.position.set(ox, oy, oz);
+      placed.current = true;
     }
+    // Frame-rate independent easing toward the target placement.
+    const k = 1 - Math.exp(-dt * 2.4);
+    const faceOn = FACE_ON.includes(cfg.shape);
+    if (cfg.spin) {
+      // Discs swirl visibly around their centre; 3D shapes turn slowly.
+      u.uSpin.value += dt * (faceOn ? 0.22 : 0.05);
+    } else {
+      const home = Math.round(u.uSpin.value / TAU) * TAU;
+      u.uSpin.value += (home - u.uSpin.value) * k;
+    }
+    u.uTilt.value += ((faceOn ? FACE_TILT : 0) - u.uTilt.value) * k;
+    u.uScale.value += (cfg.scale - u.uScale.value) * k;
+    u.uSplit.value += ((cfg.layout === 'split' ? cfg.split : 0) - u.uSplit.value) * k;
+    g.rotation.x += (pointer.y * 0.25 - g.rotation.x) * k;
+    g.position.x += (ox + pointer.x * 0.4 - g.position.x) * k;
+    g.position.y += (oy - g.position.y) * k;
+    g.position.z += (oz - g.position.z) * k;
   });
 
   return (
-    <group ref={group} position={offset}>
+    <group ref={group}>
       <points ref={ref} geometry={geometry} material={material} frustumCulled={false} />
     </group>
   );

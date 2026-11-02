@@ -37,10 +37,23 @@ describe('particle shapes', () => {
   it.each(SHAPE_NAMES)('%s returns the requested count inside the stage box', (name) => {
     const pts = makeShape(name, 500);
     expect(pts).toHaveLength(1500);
+    // The intro burst deliberately spills past the screen edges.
+    const bound = name === 'burst' ? 12 : 7;
     for (const v of pts) {
       expect(Number.isFinite(v)).toBe(true);
-      expect(Math.abs(v)).toBeLessThan(7);
+      expect(Math.abs(v)).toBeLessThan(bound);
     }
+  });
+  it('ball is small and dense, burst spreads wide, ribbon is tall', () => {
+    const extent = (pts, axis) => {
+      let max = 0;
+      for (let i = axis; i < pts.length; i += 3) max = Math.max(max, Math.abs(pts[i]));
+      return max;
+    };
+    const ball = makeShape('ball', 500);
+    expect(Math.max(extent(ball, 0), extent(ball, 1), extent(ball, 2))).toBeLessThanOrEqual(0.85);
+    expect(extent(makeShape('burst', 500), 0)).toBeGreaterThan(8);
+    expect(extent(makeShape('ribbon', 500), 1)).toBeGreaterThan(3.5);
   });
   it('is stable for the same seed', () => {
     expect(Array.from(makeShape('ring', 20))).toEqual(Array.from(makeShape('ring', 20)));
