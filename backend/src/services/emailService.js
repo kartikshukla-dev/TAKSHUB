@@ -62,6 +62,11 @@ function getTransporter() {
     port,
     secure: port === 465,
     auth: { user: env('SMTP_USER'), pass: env('SMTP_PASS') },
+    // Fail fast when the host blocks SMTP (Render free blocks 25/465/587)
+    // instead of hanging the sign-in request.
+    connectionTimeout: 15000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
   });
   return transporter;
 }

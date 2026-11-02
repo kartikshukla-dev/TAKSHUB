@@ -20,8 +20,9 @@ function googleConfigured() {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
+// Main frontend URL (first entry of FRONTEND_URL), used for Google redirects.
 function frontendUrl() {
-  return (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+  return require('../utils/frontendUrls').primaryFrontendUrl();
 }
 
 function hashCode(email, code) {

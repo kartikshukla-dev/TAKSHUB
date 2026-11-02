@@ -58,8 +58,7 @@ function esc(value) {
 }
 
 function appUrl(path = '') {
-  const base = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
-  return `${base}${path}`;
+  return `${require('../utils/frontendUrls').primaryFrontendUrl()}${path}`;
 }
 
 function formatDate(date, withTime = true) {
