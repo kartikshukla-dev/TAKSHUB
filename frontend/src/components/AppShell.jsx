@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import PageTransition from './PageTransition';
-import useSmoothScroll from '../hooks/useSmoothScroll';
+import ThemeToggle from './ThemeToggle';
 import { useAuth } from '../context/AuthContext';
 import { LiveProvider, useLive } from '../context/LiveContext';
 import { TaskUiProvider, useTaskUi } from '../context/TaskUiContext';
@@ -29,13 +29,16 @@ const WORKSPACE = [
   { to: '/reports', label: 'Reports', icon: 'chart' },
 ];
 
-function NavItem({ item, collapsed, badgeCount }) {
+const pad = (n) => String(n).padStart(2, '0');
+
+function NavItem({ item, collapsed, badgeCount, num }) {
   return (
     <NavLink
       to={item.to}
       className={({ isActive }) => `nav-item ${isActive ? 'nav-item-active' : ''}`}
       title={collapsed ? item.label : undefined}
     >
+      {!collapsed && num && <span className="nav-num">{num}</span>}
       <Icon name={item.icon} size={16} className="nav-icon" />
       {!collapsed && <span className="nav-label">{item.label}</span>}
       {badgeCount > 0 && <span className="nav-badge">{badgeCount > 99 ? '99+' : badgeCount}</span>}
@@ -65,21 +68,22 @@ function Sidebar({ collapsed, onToggle }) {
       </div>
       <nav className="sidebar-nav">
         <div className="nav-group">
-          {PERSONAL.map((item) => (
-            <NavItem key={item.to} item={item} collapsed={collapsed} badgeCount={item.badge === 'chat' ? chatUnread : 0} />
+          {!collapsed && <div className="nav-heading">Personal</div>}
+          {PERSONAL.map((item, i) => (
+            <NavItem key={item.to} item={item} collapsed={collapsed} num={pad(i + 1)} badgeCount={item.badge === 'chat' ? chatUnread : 0} />
           ))}
         </div>
         <div className="nav-group">
           {!collapsed && <div className="nav-heading">Workspace</div>}
-          {WORKSPACE.map((item) => (
-            <NavItem key={item.to} item={item} collapsed={collapsed} />
+          {WORKSPACE.map((item, i) => (
+            <NavItem key={item.to} item={item} collapsed={collapsed} num={pad(PERSONAL.length + i + 1)} />
           ))}
         </div>
         {manage.length > 0 && (
           <div className="nav-group">
             {!collapsed && <div className="nav-heading">{isAdmin ? 'Super Admin' : 'Team Head'}</div>}
-            {manage.map((item) => (
-              <NavItem key={item.to} item={item} collapsed={collapsed} />
+            {manage.map((item, i) => (
+              <NavItem key={item.to} item={item} collapsed={collapsed} num={pad(PERSONAL.length + WORKSPACE.length + i + 1)} />
             ))}
           </div>
         )}
@@ -154,6 +158,7 @@ function Topbar({ onSearch }) {
         <button type="button" className="btn btn-primary" onClick={() => openNewTask()}>
           <Icon name="plus" size={16} /> New task
         </button>
+        <ThemeToggle />
         <NotificationBell />
         <UserMenu />
       </div>
@@ -162,7 +167,6 @@ function Topbar({ onSearch }) {
 }
 
 function ShellLayout() {
-  useSmoothScroll();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('oncare_sidebar') === 'collapsed');
   const [paletteOpen, setPaletteOpen] = useState(false);
 

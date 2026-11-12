@@ -1,53 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useEffects } from '../context/EffectsContext';
 
-// Cinematic motion helpers. Everything here becomes static when effects
-// are reduced (Settings) or the OS asks for reduced motion.
+// Light motion helpers. Everything becomes static when effects are reduced
+// (Settings) or the OS asks for reduced motion.
 
-// Heading that reveals character by character (GSAP SplitText). GSAP is
-// imported lazily so it stays out of the first-load bundle. Plain strings
-// only; anything else renders as-is.
+// Page heading with a short CSS fade-up (no per-letter JS animation).
 export function RevealText({ as: Tag = 'h1', className, children }) {
-  const ref = useRef(null);
-  const { motionOff } = useEffects();
-  const text = typeof children === 'string' ? children : null;
-
-  useEffect(() => {
-    if (motionOff || !text || !ref.current) return undefined;
-    let split;
-    let tween;
-    let cancelled = false;
-    Promise.all([import('gsap'), import('gsap/SplitText')])
-      .then(([{ gsap }, { SplitText }]) => {
-        if (cancelled || !ref.current) return;
-        gsap.registerPlugin(SplitText);
-        split = new SplitText(ref.current, { type: 'chars,words', charsClass: 'reveal-char' });
-        tween = gsap.from(split.chars, {
-          yPercent: 110,
-          rotateX: -80,
-          opacity: 0,
-          duration: 0.9,
-          ease: 'expo.out',
-          stagger: 0.018,
-        });
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-      tween?.kill();
-      split?.revert();
-    };
-  }, [text, motionOff]);
-
-  return (
-    <Tag ref={ref} className={className}>
-      {children}
-    </Tag>
-  );
+  return <Tag className={[className, 'title-in'].filter(Boolean).join(' ')}>{children}</Tag>;
 }
 
-// Number that counts up from 0 when it mounts or changes.
-export function CountUp({ value, duration = 1100 }) {
+// Number that counts up from its previous value when it changes.
+export function CountUp({ value, duration = 600 }) {
   const { motionOff } = useEffects();
   const target = Number(value) || 0;
   const [shown, setShown] = useState(motionOff ? target : 0);
@@ -56,6 +19,7 @@ export function CountUp({ value, duration = 1100 }) {
   useEffect(() => {
     if (motionOff || typeof requestAnimationFrame === 'undefined') {
       setShown(target);
+      from.current = target;
       return undefined;
     }
     const start = performance.now();
@@ -63,7 +27,7 @@ export function CountUp({ value, duration = 1100 }) {
     let raf;
     const tick = (now) => {
       const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 4);
+      const eased = 1 - Math.pow(1 - t, 3);
       setShown(Math.round(begin + (target - begin) * eased));
       if (t < 1) raf = requestAnimationFrame(tick);
       else from.current = target;
@@ -75,12 +39,12 @@ export function CountUp({ value, duration = 1100 }) {
   return <>{Number.isFinite(Number(value)) ? shown : value}</>;
 }
 
-// Motion props for a staggered entrance; empty when motion is off.
+// Motion props for a short staggered entrance; empty when motion is off.
 export function staggerItem(i, motionOff) {
   if (motionOff) return {};
   return {
-    initial: { opacity: 0, y: 24, scale: 0.97, filter: 'blur(6px)' },
-    animate: { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' },
-    transition: { duration: 0.7, delay: Math.min(i, 12) * 0.05, ease: [0.16, 1, 0.3, 1] },
+    initial: { opacity: 0, y: 6 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.22, delay: Math.min(i, 8) * 0.05, ease: [0.2, 0.8, 0.2, 1] },
   };
 }

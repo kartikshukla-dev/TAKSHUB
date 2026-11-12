@@ -70,13 +70,27 @@ export function Chip({ children, tone = 'default' }) {
   return <span className={`chip chip-${tone}`}>{children}</span>;
 }
 
+// House style (matches the login page): the last word of a multi-word
+// title is set in the italic serif, e.g. "All *tasks*".
+export function styledTitle(title) {
+  if (typeof title !== 'string') return title;
+  const i = title.trim().lastIndexOf(' ');
+  if (i < 0) return title;
+  return (
+    <>
+      {title.slice(0, i + 1)}
+      <em>{title.slice(i + 1)}</em>
+    </>
+  );
+}
+
 export function PageHeader({ title, subtitle, actions, breadcrumb }) {
   return (
     <div className="page-head">
       <div>
         {breadcrumb && <div className="breadcrumb">{breadcrumb}</div>}
         <RevealText as="h1" className="page-title">
-          {title}
+          {styledTitle(title)}
         </RevealText>
         {subtitle && <p className="page-subtitle">{subtitle}</p>}
       </div>

@@ -50,6 +50,7 @@ export default function Login() {
       {step === 'email' ? (
         <form className="form-stack" onSubmit={sendCode}>
           <div>
+            <p className="kicker">01 / 02 · Sign in</p>
             <h1 className="auth-title">Welcome back</h1>
             <p className="muted">Sign in with your work email. We&apos;ll send you a one-time code.</p>
           </div>
@@ -79,6 +80,7 @@ export default function Login() {
       ) : (
         <form className="form-stack" onSubmit={verify}>
           <div>
+            <p className="kicker">02 / 02 · Verify</p>
             <h1 className="auth-title">Check your email</h1>
             <p className="muted">
               We sent a 6-digit code to <strong>{email}</strong>.

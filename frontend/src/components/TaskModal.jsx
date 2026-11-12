@@ -52,14 +52,23 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
     onUpdated?.(updated);
   };
 
+  // Optimistic: the modal (and every open list/board) shows the change at
+  // once; the server reply then fills in activity, and a failure rolls back.
   const patch = async (payload) => {
     setError('');
+    const before = task;
+    const local = { ...payload };
+    if ('assignee' in local) local.assignee = local.assignee ? users.find((u) => u._id === local.assignee) || local.assignee : null;
+    if ('toTeam' in local) local.toTeam = local.toTeam ? departments.find((d) => d._id === local.toTeam) || local.toTeam : null;
+    const optimistic = { ...before, ...local };
+    setTask(optimistic);
+    emitTaskChange(optimistic);
     try {
       const updated = await tasksApi.updateTask(projectId, task._id, payload);
       apply(updated);
-      // Refresh activity log so the change shows up immediately.
-      tasksApi.getTask(projectId, task._id).then(setTask).catch(() => {});
     } catch (err) {
+      setTask(before);
+      emitTaskChange(before);
       setError(err.response?.data?.message || 'Update failed');
     }
   };

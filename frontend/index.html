@@ -1,20 +1,32 @@
 <!doctype html>
-<html lang="en" style="background:#05060a">
-  <!-- Dark only: set the base colour before CSS loads to avoid a white flash. -->
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TaskHub · Oncare</title>
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
-    <meta name="theme-color" content="#05060a" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#f3efe6" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- Apply the saved theme (System / Light / Dark) before CSS loads, so
+         the page never flashes the wrong colours. Mirrors ThemeContext. -->
+    <script>
+      (function () {
+        var m = 'system';
+        try { m = localStorage.getItem('taskhub_theme') || 'system'; } catch (e) {}
+        var dark = m === 'dark' || (m !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+        var r = document.documentElement;
+        r.dataset.theme = dark ? 'dark' : 'light';
+        r.style.colorScheme = dark ? 'dark' : 'light';
+        r.style.background = dark ? '#0a0a09' : '#f3efe6';
+      })();
+    </script>
+    <!-- Satoshi (Fontshare, free for commercial use) + JetBrains Mono for task keys -->
+    <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>

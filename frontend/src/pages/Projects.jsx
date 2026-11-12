@@ -7,16 +7,13 @@ import CreateProjectModal from '../components/CreateProjectModal';
 import Icon from '../components/Icon';
 import { Avatar, EmptyState, PageHeader, ProgressRing } from '../components/ui';
 import { GalaxyToggle, Galaxy, useGalaxyMode } from '../components/GalaxySwitch';
-import useTilt from '../hooks/useTilt';
 import { formatShortDate } from '../utils/format';
 import { ProgressBar } from './Dashboard';
 
 function ProjectCard({ project }) {
-  const tilt = useTilt();
   const pct = project.taskCount ? Math.round((project.doneCount / project.taskCount) * 100) : 0;
   return (
-    <Link to={`/projects/${project._id}`} className="project-card tilt" {...tilt}>
-      <span className="tilt-glare" aria-hidden="true" />
+    <Link to={`/projects/${project._id}`} className="project-card">
       <div className="project-card-head">
         <div>
           <h3 className="project-name">{project.name}</h3>

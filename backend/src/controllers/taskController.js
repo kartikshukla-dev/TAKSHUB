@@ -74,6 +74,14 @@ async function assertAssigneeInTeam(assigneeId, team) {
   }
 }
 
+// Runs notification / email work after the HTTP reply has gone out. Errors
+// are logged only; they must never reach Express (headers are already sent).
+function afterResponse(label, fn) {
+  Promise.resolve()
+    .then(fn)
+    .catch((err) => console.error(`[${label}] follow-up failed:`, err.message));
+}
+
 function taskRef(task, project) {
   return task.number ? `${project.key}-${task.number}` : project.key;
 }
@@ -160,6 +168,8 @@ const createTask = catchAsync(async (req, res) => {
   const populated = await task.populate(TASK_POPULATE);
   emitTaskEvent(project, populated, 'task:created', populated);
 
+  res.status(201).json({ task: populated });
+  afterResponse('task-created', async () => {
   const ref = taskRef(task, project);
   const link = taskLink(task, project);
 
@@ -189,8 +199,7 @@ const createTask = catchAsync(async (req, res) => {
         .catch(logEmailError('task-created'));
     }
   }
-
-  res.status(201).json({ task: populated });
+  });
 });
 
 const listTasks = catchAsync(async (req, res) => {
@@ -299,9 +308,19 @@ const updateTask = catchAsync(async (req, res) => {
   task.activityLog.push(...logEntries);
   await task.save();
 
-  const populated = await task.populate(TASK_POPULATE);
+  // Full detail (comment authors + activity names) so the task modal can
+  // show the change without a second GET.
+  const populated = await task.populate([
+    ...TASK_POPULATE,
+    { path: 'comments.author', select: USER_FIELDS },
+    { path: 'activityLog.changedBy', select: USER_FIELDS },
+  ]);
   emitTaskEvent(project, populated, 'task:updated', populated);
 
+  // Reply now; notifications and emails don't need to hold up the person
+  // making the change.
+  res.status(200).json({ task: populated });
+  afterResponse('task-updated', async () => {
   const ref = taskRef(task, project);
   const link = taskLink(task, project);
   const newAssignee = idStr(populated.assignee);
@@ -356,8 +375,7 @@ const updateTask = catchAsync(async (req, res) => {
         .catch(logEmailError('task-updated'));
     }
   }
-
-  res.status(200).json({ task: populated });
+  });
 });
 
 const deleteTask = catchAsync(async (req, res) => {
@@ -389,6 +407,8 @@ const addComment = catchAsync(async (req, res) => {
   ]);
   emitTaskEvent(project, populated, 'task:commented', populated);
 
+  res.status(201).json({ task: populated });
+  afterResponse('task-comment', async () => {
   const others = (await watcherIds(populated)).filter((id) => id !== idStr(req.user._id));
   notify(others, {
     actor: req.user._id,
@@ -402,8 +422,7 @@ const addComment = catchAsync(async (req, res) => {
       .sendTaskCommentEmail({ task: populated, project, recipients: people, actor: req.user, comment: text })
       .catch(logEmailError('task-comment'));
   }
-
-  res.status(201).json({ task: populated });
+  });
 });
 
 const uploadAttachment = catchAsync(async (req, res) => {

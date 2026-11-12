@@ -1,25 +1,37 @@
+import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppShell from './components/AppShell';
 import Login from './pages/Login';
-import Users from './pages/Users';
-import TeamLeads from './pages/TeamLeads';
-import TeamDetail from './pages/TeamDetail';
-import { useAuth } from './context/AuthContext';
-import StageHost from './stage/StageHost';
 import OAuthCallback from './pages/OAuthCallback';
-import Dashboard from './pages/Dashboard';
-import TasksPage from './pages/TasksPage';
-import Todos from './pages/Todos';
-import Chat from './pages/Chat';
-import Projects from './pages/Projects';
-import ProjectDetail from './pages/ProjectDetail';
-import Team from './pages/Team';
-import MemberDetail from './pages/MemberDetail';
-import Calendar from './pages/Calendar';
-import Activity from './pages/Activity';
-import Reports from './pages/Reports';
-import Settings from './pages/Settings';
+import { useAuth } from './context/AuthContext';
+
+// Pages load on demand: the first visit only downloads the shell and the
+// page being opened, the rest arrive in small chunks when visited.
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const TasksPage = lazy(() => import('./pages/TasksPage'));
+const Todos = lazy(() => import('./pages/Todos'));
+const Chat = lazy(() => import('./pages/Chat'));
+const Projects = lazy(() => import('./pages/Projects'));
+const ProjectDetail = lazy(() => import('./pages/ProjectDetail'));
+const Team = lazy(() => import('./pages/Team'));
+const MemberDetail = lazy(() => import('./pages/MemberDetail'));
+const Calendar = lazy(() => import('./pages/Calendar'));
+const Activity = lazy(() => import('./pages/Activity'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Settings = lazy(() => import('./pages/Settings'));
+const TeamDetail = lazy(() => import('./pages/TeamDetail'));
+const TeamLeads = lazy(() => import('./pages/TeamLeads'));
+const Users = lazy(() => import('./pages/Users'));
+
+// Warm the most used pages in the background once the app is idle.
+if (typeof window !== 'undefined') {
+  const warm = () => {
+    import('./pages/Dashboard');
+    import('./pages/TasksPage');
+  };
+  (window.requestIdleCallback || ((f) => setTimeout(f, 1500)))(warm);
+}
 
 // Pages only Super Admins can open.
 function AdminOnly({ children }) {
@@ -27,14 +39,10 @@ function AdminOnly({ children }) {
   return isAdmin ? children : <Navigate to="/dashboard" replace />;
 }
 
+const page = (el) => <Suspense fallback={<div className="page page-loading" aria-busy="true" />}>{el}</Suspense>;
+
 export default function App() {
-  return (
-    <>
-      {/* One persistent 3D stage behind every page (login included). */}
-      <StageHost />
-      <AppRoutes />
-    </>
-  );
+  return <AppRoutes />;
 }
 
 function AppRoutes() {
@@ -52,23 +60,23 @@ function AppRoutes() {
         }
       >
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/my-tasks" element={<TasksPage mode="mine" />} />
-        <Route path="/created-by-me" element={<TasksPage mode="created" />} />
-        <Route path="/tasks" element={<TasksPage mode="all" />} />
-        <Route path="/todos" element={<Todos />} />
-        <Route path="/chat" element={<Chat />} />
-        <Route path="/projects" element={<Projects />} />
-        <Route path="/projects/:id" element={<ProjectDetail />} />
-        <Route path="/team" element={<Team />} />
-        <Route path="/team/:id" element={<MemberDetail />} />
-        <Route path="/calendar" element={<Calendar />} />
-        <Route path="/activity" element={<Activity />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/teams/:id" element={<TeamDetail />} />
-        <Route path="/team-leads" element={<AdminOnly><TeamLeads /></AdminOnly>} />
-        <Route path="/users" element={<AdminOnly><Users /></AdminOnly>} />
+        <Route path="/dashboard" element={page(<Dashboard />)} />
+        <Route path="/my-tasks" element={page(<TasksPage mode="mine" />)} />
+        <Route path="/created-by-me" element={page(<TasksPage mode="created" />)} />
+        <Route path="/tasks" element={page(<TasksPage mode="all" />)} />
+        <Route path="/todos" element={page(<Todos />)} />
+        <Route path="/chat" element={page(<Chat />)} />
+        <Route path="/projects" element={page(<Projects />)} />
+        <Route path="/projects/:id" element={page(<ProjectDetail />)} />
+        <Route path="/team" element={page(<Team />)} />
+        <Route path="/team/:id" element={page(<MemberDetail />)} />
+        <Route path="/calendar" element={page(<Calendar />)} />
+        <Route path="/activity" element={page(<Activity />)} />
+        <Route path="/reports" element={page(<Reports />)} />
+        <Route path="/settings" element={page(<Settings />)} />
+        <Route path="/teams/:id" element={page(<TeamDetail />)} />
+        <Route path="/team-leads" element={page(<AdminOnly><TeamLeads /></AdminOnly>)} />
+        <Route path="/users" element={page(<AdminOnly><Users /></AdminOnly>)} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>

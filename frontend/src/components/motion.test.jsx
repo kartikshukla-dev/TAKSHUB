@@ -20,8 +20,8 @@ describe('motion helpers', () => {
     localStorage.removeItem('taskhub_reduce_effects');
   });
 
-  it('the app shell has no light/dark toggle any more', async () => {
+  it('the app shell offers the theme toggle', async () => {
     const src = await import('./AppShell.jsx?raw');
-    expect(src.default).not.toMatch(/Toggle dark mode|toggleTheme|useTheme/);
+    expect(src.default).toMatch(/ThemeToggle/);
   });
 });
