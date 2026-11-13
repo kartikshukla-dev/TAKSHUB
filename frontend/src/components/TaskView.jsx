@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import * as tasksApi from '../api/tasks';
 import { useUsers, useProjects } from '../hooks/useDirectory';
-import useTaskChanges from '../hooks/useTaskChanges';
+import { useSocketEvent } from '../context/SocketContext';
+import { onTaskChange } from '../utils/taskEvents';
 import { useTaskUi } from '../context/TaskUiContext';
 import FilterBar, { EMPTY_FILTERS } from './FilterBar';
 import TaskTable from './TaskTable';
@@ -34,6 +35,18 @@ function filtersFromParams(params) {
     open: params.get('open') === '1',
     label: params.get('label') || '',
   };
+}
+
+// Stable debounced caller that always runs the latest `fn`.
+function useDebounced(fn, delay) {
+  const fnRef = useRef(fn);
+  fnRef.current = fn;
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return useCallback(() => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => fnRef.current(), delay);
+  }, [delay]);
 }
 
 function filtersToParams(f, extra) {
@@ -78,6 +91,8 @@ export default function TaskView({
   const [dir, setDir] = useState(params.get('dir') || (params.get('sort') === 'due' ? 'asc' : 'desc'));
   const [view, setView] = useState(() => localStorage.getItem(`oncare_view_${storageKey}`) || 'list');
   const [tasks, setTasks] = useState([]);
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -106,7 +121,35 @@ export default function TaskView({
     return () => clearTimeout(t);
   }, [load, filters.q]);
 
-  useTaskChanges(load);
+  // Edits update the one task in place (no full reload, no flicker). Only
+  // new tasks, or a change to a task this list doesn't have yet, refetch.
+  const refetchSoon = useDebounced(load, 400);
+  const mergeTask = useCallback(
+    (changed) => {
+      if (!changed?._id) return;
+      if (!tasksRef.current.some((t) => t._id === changed._id)) {
+        refetchSoon();
+        return;
+      }
+      setTasks((prev) => prev.map((t) => (t._id === changed._id ? { ...t, ...changed } : t)));
+    },
+    [refetchSoon]
+  );
+  const removeTask = useCallback((id) => setTasks((prev) => prev.filter((t) => t._id !== String(id))), []);
+
+  useEffect(
+    () =>
+      onTaskChange(({ task, kind }) => {
+        if (kind === 'deleted') removeTask(task?._id);
+        else if (kind === 'created') refetchSoon();
+        else mergeTask(task);
+      }),
+    [mergeTask, removeTask, refetchSoon]
+  );
+  useSocketEvent('task:created', refetchSoon);
+  useSocketEvent('task:updated', mergeTask);
+  useSocketEvent('task:commented', mergeTask);
+  useSocketEvent('task:deleted', (p) => removeTask(p?.id));
 
   useEffect(() => {
     if (!syncUrl) return;

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLive } from '../context/LiveContext';
 import { useEffects } from '../context/EffectsContext';
 import { Card, PageHeader, Toggle } from '../components/ui';
+import { ThemePicker } from '../components/ThemeToggle';
 import { ROLE_LABEL, WORKSPACE_NAME } from '../utils/format';
 
 function ProfileCard() {
@@ -53,8 +54,7 @@ function ProfileCard() {
           <div>
             <strong>Email me notifications</strong>
             <span className="muted small">
-              Emails when a task is assigned to you, completed, or gets a comment. Security emails (like password changes)
-              are always sent.
+              Emails when a task is assigned to you, completed, or gets a comment. Sign-in codes are always sent.
             </span>
           </div>
           <Toggle checked={emailNotifications} onChange={setEmailNotifications} label="Email me notifications" />
@@ -70,16 +70,22 @@ function ProfileCard() {
 }
 
 function EffectsCard() {
-  const { reduceEffects, setReduceEffects, reducedMotion, webgl } = useEffects();
+  const { reduceEffects, setReduceEffects, reducedMotion } = useEffects();
   return (
-    <Card title="Visual effects" subtitle="The 3D background and animations. Saved for this browser.">
+    <Card title="Appearance" subtitle="Saved for this browser.">
+      <div className="setting-row">
+        <div>
+          <strong>Theme</strong>
+          <span className="muted small">System follows your computer&apos;s light or dark setting.</span>
+        </div>
+        <ThemePicker />
+      </div>
       <div className="setting-row">
         <div>
           <strong>Reduce effects</strong>
           <span className="muted small">
-            Turns off the 3D background and most animations. Use it on slower computers or if motion bothers you.
-            {reducedMotion && ' Your system asks for reduced motion, so effects are already off.'}
-            {!webgl && ' This browser has no WebGL, so a static background is shown.'}
+            Turns off animations. Use it on slower computers or if motion bothers you.
+            {reducedMotion && ' Your system asks for reduced motion, so animations are already off.'}
           </span>
         </div>
         <Toggle checked={reduceEffects} onChange={setReduceEffects} label="Reduce effects" />

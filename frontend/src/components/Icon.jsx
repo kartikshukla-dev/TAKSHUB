@@ -77,6 +77,12 @@ const PATHS = {
   ),
   plus: <path d="M5 12h14M12 5v14" />,
   moon: <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />,
+  monitor: (
+    <>
+      <rect width="20" height="14" x="2" y="3" rx="2" />
+      <path d="M8 21h8M12 17v4" />
+    </>
+  ),
   sun: (
     <>
       <circle cx="12" cy="12" r="4" />

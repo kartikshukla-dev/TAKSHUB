@@ -3,16 +3,13 @@ import { Link } from 'react-router-dom';
 import * as usersApi from '../api/users';
 import { Avatar, EmptyState, PageHeader, ProgressRing } from '../components/ui';
 import { GalaxyToggle, Galaxy, useGalaxyMode } from '../components/GalaxySwitch';
-import useTilt from '../hooks/useTilt';
 
 // Share of a team's open work that already has someone on it.
 const assignedShare = (t) => (t.open ? (t.open - (t.unassigned || 0)) / t.open : 1);
 
 function TeamCard({ t }) {
-  const tilt = useTilt();
   return (
-    <Link to={`/teams/${t._id}`} className="team-card tilt" {...tilt}>
-      <span className="tilt-glare" aria-hidden="true" />
+    <Link to={`/teams/${t._id}`} className="team-card">
       <div className="team-card-head">
         <div>
           <h3 className="project-name">{t.name}</h3>

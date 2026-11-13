@@ -57,9 +57,9 @@ async function archivedProjectIds() {
 }
 
 async function scopedTasks(user, { personal }) {
-  const and = [await visibleTaskFilter(user)];
+  const [filter, archived] = await Promise.all([visibleTaskFilter(user), archivedProjectIds()]);
+  const and = [filter];
   if (personal) and.push({ $or: [{ assignee: user._id }, { reporter: user._id }] });
-  const archived = await archivedProjectIds();
   if (archived.length) and.push({ project: { $nin: archived } });
   return Task.find(and.length === 1 ? and[0] : { $and: and })
     .select('-activityLog -comments -attachments')
@@ -139,7 +139,23 @@ const dashboard = catchAsync(async (req, res) => {
   const from = new Date(today.getTime() - (days - 1) * DAY);
   const me = req.user._id.toString();
 
-  const involved = await scopedTasks(req.user, { personal: true });
+  // One visibility filter + archived lookup, then a single task query: the
+  // "involved" set (assignee or reporter is me) is a slice of what I can see,
+  // so it is filtered in memory instead of queried again. The activity feed
+  // runs in parallel. Fewer sequential round-trips to the database.
+  const [filter, archived] = await Promise.all([visibleTaskFilter(req.user), archivedProjectIds()]);
+  const and = [filter];
+  if (archived.length) and.push({ project: { $nin: archived } });
+  const activityFilter = { $and: [filter, { $or: [{ assignee: req.user._id }, { reporter: req.user._id }] }] };
+  const [visible, activity] = await Promise.all([
+    Task.find(and.length === 1 ? and[0] : { $and: and })
+      .select('-activityLog -comments -attachments')
+      .populate(TASK_POPULATE)
+      .lean(),
+    buildFeed(activityFilter, 8),
+  ]);
+
+  const involved = visible.filter((t) => idOf(t.assignee) === me || idOf(t.reporter) === me);
   const mine = involved.filter((t) => idOf(t.assignee) === me);
   const openMine = mine.filter(isOpen);
 
@@ -167,14 +183,12 @@ const dashboard = catchAsync(async (req, res) => {
 
   // Workload / project progress use everything the user can see, so a
   // manager gets a team view while an employee sees their own slice.
-  const visible = await scopedTasks(req.user, { personal: false });
-  const workload = (await workloadRows(visible, from, today, false)).filter((r) => r.open > 0).slice(0, 8);
-  const projects = (await projectRows(req.user, visible, today)).filter((p) => p.total > 0).slice(0, 8);
-
-  const activityFilter = {
-    $and: [await visibleTaskFilter(req.user), { $or: [{ assignee: req.user._id }, { reporter: req.user._id }] }],
-  };
-  const activity = await buildFeed(activityFilter, 8);
+  const [workloadAll, projectsAll] = await Promise.all([
+    workloadRows(visible, from, today, false),
+    projectRows(req.user, visible, today),
+  ]);
+  const workload = workloadAll.filter((r) => r.open > 0).slice(0, 8);
+  const projects = projectsAll.filter((p) => p.total > 0).slice(0, 8);
 
   res.status(200).json({
     days,
@@ -201,6 +215,10 @@ const reports = catchAsync(async (req, res) => {
   const head = req.user.role === 'manager';
 
   const tasks = await scopedTasks(req.user, { personal: !staff && !head });
+  const [workload, projects] = await Promise.all([
+    workloadRows(tasks, from, today, staff),
+    projectRows(req.user, tasks, today),
+  ]);
   const open = tasks.filter(isOpen);
   const completedInRange = tasks.filter((t) => t.completedAt && new Date(t.completedAt) >= from);
 
@@ -229,8 +247,8 @@ const reports = catchAsync(async (req, res) => {
     series: dailySeries(tasks, days),
     byStatus,
     byPriority,
-    workload: await workloadRows(tasks, from, today, staff),
-    projects: await projectRows(req.user, tasks, today),
+    workload,
+    projects,
   });
 });
 

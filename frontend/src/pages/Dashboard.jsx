@@ -7,7 +7,7 @@ import * as ws from '../api/workspace';
 import LineChart from '../components/LineChart';
 import Icon from '../components/Icon';
 import { CountUp } from '../components/motion';
-import { Avatar, Card, EmptyState, PageHeader, StatusPill } from '../components/ui';
+import { Avatar, Card, EmptyState, StatusPill } from '../components/ui';
 import { WORKSPACE_NAME, taskKey, formatShortDate, dueState, describeActivity, timeAgo } from '../utils/format';
 
 export const RANGES = [
@@ -29,10 +29,13 @@ export function RangeSelect({ value, onChange }) {
   );
 }
 
-function StatCard({ label, value, sub, to }) {
+function StatCard({ label, value, sub, to, tone }) {
   const body = (
     <>
-      <span className="stat-label">{label}</span>
+      <span className="stat-label">
+        {tone && <i className={`stat-dot stat-dot-${tone}`} aria-hidden="true" />}
+        {label}
+      </span>
       <span className="stat-value"><CountUp value={value} /></span>
       {sub && <span className="stat-sub">{sub}</span>}
     </>
@@ -43,6 +46,57 @@ function StatCard({ label, value, sub, to }) {
     </Link>
   ) : (
     <div className="stat-card">{body}</div>
+  );
+}
+
+function greeting(d = new Date()) {
+  const h = d.getHours();
+  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+}
+
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+// Brand band at the top of the dashboard: greeting, a one-line summary and
+// the three numbers people check first.
+function DashboardHero({ firstName, cards, days, setDays, onNewTask }) {
+  const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+  const summary = cards
+    ? cards.open === 0
+      ? 'Nothing open on your plate. Raise a task or enjoy the calm.'
+      : `You have ${plural(cards.open, 'open task', 'open tasks')}, ${cards.dueToday} due today and ${cards.overdue} overdue.`
+    : 'Loading your day…';
+  const metrics = [
+    { label: 'Open', value: cards?.open, to: '/tasks?open=1&assignee=me' },
+    { label: 'Due today', value: cards?.dueToday, to: '/my-tasks?due=today' },
+    { label: 'Overdue', value: cards?.overdue, to: '/my-tasks?due=overdue', alert: cards?.overdue > 0 },
+  ];
+  return (
+    <section className="hero-band">
+      <div className="hero-copy">
+        <span className="hero-kicker">
+          {today} · {WORKSPACE_NAME}
+        </span>
+        <h1 className="hero-title title-in">
+          {greeting()}, <em>{firstName}.</em>
+        </h1>
+        <p className="hero-summary">{summary}</p>
+        <div className="hero-actions">
+          <button type="button" className="btn hero-btn" onClick={onNewTask}>
+            <Icon name="plus" size={16} /> New task
+          </button>
+          <RangeSelect value={days} onChange={setDays} />
+        </div>
+      </div>
+      <div className="hero-metrics">
+        {metrics.map((m, i) => (
+          <Link key={m.label} to={m.to} className={`hero-metric ${m.alert ? 'hero-metric-alert' : ''}`}>
+            <span className="hero-metric-num">0{i + 1}</span>
+            <span className="hero-metric-value">{m.value === undefined ? '–' : <CountUp value={m.value} />}</span>
+            <span className="hero-metric-label">{m.label}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -81,11 +135,7 @@ export default function Dashboard() {
 
   return (
     <div className="page">
-      <PageHeader
-        title={`Welcome back, ${firstName}`}
-        subtitle={`${WORKSPACE_NAME} · Your tasks`}
-        actions={<RangeSelect value={days} onChange={setDays} />}
-      />
+      <DashboardHero firstName={firstName} cards={data?.cards} days={days} setDays={setDays} onNewTask={() => openNewTask()} />
 
       {error && <div className="alert alert-error">{error}</div>}
 
@@ -106,19 +156,17 @@ export default function Dashboard() {
 
       {data && (
         <>
-          <div className="stat-grid stat-grid-8">
-            <StatCard label="Open tasks" value={data.cards.open} to="/tasks?open=1&assignee=me" />
-            <StatCard label="Assigned to me" value={data.cards.assignedToMe} to="/my-tasks?open=1" />
-            <StatCard label="In progress" value={data.cards.inProgress} to="/my-tasks?status=in-progress" />
-            <StatCard label="Awaiting review" value={data.cards.inReview} to="/my-tasks?status=in-review" />
-            <StatCard label="Overdue" value={data.cards.overdue} to="/my-tasks?due=overdue" />
-            <StatCard label="Due today" value={data.cards.dueToday} to="/my-tasks?due=today" />
-            <StatCard label="Blocked" value={data.cards.blocked} to="/my-tasks?blocked=1&open=1" />
+          <div className="stat-grid stat-grid-5">
+            <StatCard label="Assigned to me" value={data.cards.assignedToMe} to="/my-tasks?open=1" tone="todo" />
+            <StatCard label="In progress" value={data.cards.inProgress} to="/my-tasks?status=in-progress" tone="progress" />
+            <StatCard label="Awaiting review" value={data.cards.inReview} to="/my-tasks?status=in-review" tone="review" />
+            <StatCard label="Blocked" value={data.cards.blocked} to="/my-tasks?blocked=1&open=1" tone="blocked" />
             <StatCard
               label="Completed"
               value={data.cards.completed}
               sub={RANGES.find((r) => r.days === days)?.label}
               to={`/my-tasks?status=done`}
+              tone="done"
             />
           </div>
 

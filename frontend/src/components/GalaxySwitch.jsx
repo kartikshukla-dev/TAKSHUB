@@ -12,9 +12,9 @@ export function useGalaxyMode(key) {
   const available = webgl && !motionOff;
   const [mode, setMode] = useState(() => {
     try {
-      return localStorage.getItem(`taskhub_view_${key}`) || 'galaxy';
+      return localStorage.getItem(`taskhub_view_${key}`) || 'grid';
     } catch {
-      return 'galaxy';
+      return 'grid';
     }
   });
   const change = (m) => {

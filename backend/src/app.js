@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const passport = require('passport');
+const compression = require('compression');
 
 const { getConnectionState } = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
@@ -15,6 +16,8 @@ function createApp() {
   const app = express();
 
   app.use(cors({ origin: require('./utils/frontendUrls').corsOrigin(), credentials: true }));
+  // gzip JSON replies (task lists shrink ~5-10x over the wire).
+  app.use(compression({ threshold: 1024 }));
   app.use(express.json());
   app.use(passport.initialize());
 

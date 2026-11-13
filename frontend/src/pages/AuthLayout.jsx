@@ -2,9 +2,6 @@ import { useEffect, useState } from 'react';
 import { BrandMark } from '../components/Icon';
 import { WORKSPACE_NAME, APP_NAME } from '../utils/format';
 import { getProviders, googleLoginUrl } from '../api/auth';
-import { useLocation } from 'react-router-dom';
-import { useEffects } from '../context/EffectsContext';
-import { INTRO_REVEAL_EVENT } from '../stage/useIntro';
 
 export const GOOGLE_ERRORS = {
   google_not_configured: 'Google sign-in is not set up on this server yet.',
@@ -15,39 +12,75 @@ export const GOOGLE_ERRORS = {
   google_disabled: 'This account has been disabled. Contact your Super Admin.',
 };
 
-// Longest wait for the background intro before the card shows anyway
-// (slow three.js chunk, WebGL failure).
-const REVEAL_FALLBACK_MS = 3500;
+// Sample cards for the login feed (decorative, not real data). Listed
+// twice so the CSS loop (translateY -50%) is seamless.
+const FEED = [
+  ['REQ-12', 'Monthly patient report', 'Operations → Data', 'In progress', 'st-progress'],
+  ['WEB-4', 'Doctor profile pages', 'Marketing', 'In review', 'st-review'],
+  ['REQ-9', 'Pharmacy items in estimate', 'Ops → Tech', 'Done', 'st-done'],
+  ['CLN-2', 'Staff training slots', 'Operations', 'To do', 'st-todo'],
+  ['APP-7', 'Appointment reminders', 'Tech', 'In progress', 'st-progress'],
+  ['DWH-3', 'Clinic KPI dashboard', 'Data', 'Done', 'st-done'],
+];
+
+function AuthHero() {
+  return (
+    <aside className="auth-hero" aria-hidden="true">
+      <div className="auth-hero-brand">
+        <BrandMark size={30} />
+        <span>
+          {APP_NAME} <small>by {WORKSPACE_NAME}</small>
+        </span>
+      </div>
+      <div>
+        <p className="kicker auth-kicker">
+          {WORKSPACE_NAME} · {APP_NAME}
+          <br />
+          Tasks · Teams · Deadlines
+        </p>
+        <h2 className="auth-statement">
+          Every team&apos;s work, <em>in one place.</em>
+        </h2>
+        <p className="auth-lede">Raise a task to any team, see who is on it and when it is due, and know the moment it is done.</p>
+      </div>
+      <div className="auth-feed">
+        <div className="auth-feed-track">
+          {[...FEED, ...FEED].map(([key, title, team, status, cls], i) => (
+            <div className="auth-feed-card" key={i}>
+              <span className="key">{key}</span>
+              <span className="title">
+                {title}
+                <small>{team}</small>
+              </span>
+              <span className={`st ${cls}`}>{status}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="auth-hero-foot">
+        <span>◇ {WORKSPACE_NAME} · Private workspace</span>
+        <span>Invite only / 01</span>
+      </div>
+    </aside>
+  );
+}
 
 export function AuthLayout({ children }) {
-  const { pathname } = useLocation();
-  const { quality } = useEffects();
-  const intro = pathname === '/login' && quality !== 'off';
-  const [revealed, setRevealed] = useState(false);
-
-  // The card appears the moment the intro ball bursts.
-  useEffect(() => {
-    if (!intro) return undefined;
-    setRevealed(false);
-    const reveal = () => setRevealed(true);
-    window.addEventListener(INTRO_REVEAL_EVENT, reveal);
-    const timer = setTimeout(reveal, REVEAL_FALLBACK_MS);
-    return () => {
-      window.removeEventListener(INTRO_REVEAL_EVENT, reveal);
-      clearTimeout(timer);
-    };
-  }, [intro]);
-
-  const cls = ['auth-page', intro && 'auth-intro', intro && revealed && 'is-revealed'].filter(Boolean).join(' ');
-
   return (
-    <div className={cls}>
-      <div className="auth-brand">
-        <BrandMark size={28} />
-        <span className="brand-name">{APP_NAME}</span>
-      </div>
-      <div className="auth-card">{children}</div>
-      <p className="auth-foot">{APP_NAME} is {WORKSPACE_NAME}&apos;s private workspace. Use your work email.</p>
+    <div className="auth-split">
+      <AuthHero />
+      <main className="auth-panel">
+        <div className="auth-panel-inner">
+          <div className="auth-brand">
+            <BrandMark size={28} />
+            <span className="brand-name">{APP_NAME}</span>
+          </div>
+          {children}
+          <p className="auth-foot">
+            {APP_NAME} is {WORKSPACE_NAME}&apos;s private workspace. Use your work email.
+          </p>
+        </div>
+      </main>
     </div>
   );
 }
