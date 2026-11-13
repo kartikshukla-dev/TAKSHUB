@@ -86,7 +86,7 @@ export function LiveProvider({ children }) {
   useSocketEvent('notification:new', (n) => {
     setNotifications((prev) => [n, ...prev].slice(0, 30));
     setUnreadCount((c) => c + 1);
-    popUp('TaskHub', n.text, n.link);
+    popUp('Tasks Manager', n.text, n.link);
   });
 
   useSocketEvent('chat:message', ({ conversationId, conversationName, message }) => {

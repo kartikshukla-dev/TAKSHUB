@@ -1,4 +1,4 @@
-/* TaskHub design tokens: light (default) and dark, switched by
+/* Tasks Manager design tokens: light (default) and dark, switched by
    html[data-theme] (System / Light / Dark, see ThemeContext).
    Calm neutral surfaces, one Oncare violet accent, solid (no glass). */
 :root {

@@ -22,8 +22,8 @@ export const ROLES = [
   { id: 'admin', label: 'Super Admin' },
 ];
 
-// The app is TaskHub; Oncare is the company / workspace it runs for.
-export const APP_NAME = 'TaskHub';
+// The app is Tasks Manager; Oncare is the company / workspace it runs for.
+export const APP_NAME = 'Tasks Manager';
 export const WORKSPACE_NAME = 'Oncare';
 
 export const idOf = (v) => (v ? String(v._id || v.id || v) : '');

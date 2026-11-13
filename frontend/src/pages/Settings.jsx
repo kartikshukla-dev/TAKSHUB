@@ -116,7 +116,7 @@ function PushCard() {
           <strong>Notifications on this device</strong>
           <span className="muted small">
             Get a pop-up on this computer when someone messages you, assigns you a task, or comments on or changes a task
-            you&apos;re on. Works while TaskHub is open in a tab.
+            you&apos;re on. Works while Tasks Manager is open in a tab.
           </span>
         </div>
         <Toggle checked={pushEnabled} onChange={change} label="Notifications on this device" disabled={!supported} />

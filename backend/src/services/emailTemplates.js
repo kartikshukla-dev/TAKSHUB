@@ -9,7 +9,7 @@
 const LOGO_URL = () => process.env.EMAIL_LOGO_URL || 'https://www.oncarecancer.com/images/favicon.png';
 
 const BRAND = {
-  name: 'TaskHub',
+  name: 'Tasks Manager',
   company: 'Oncare',
   navy: '#002f70',
   purple: '#9966ff',

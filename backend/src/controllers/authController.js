@@ -14,7 +14,7 @@ const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Same response whether or not the email exists, so the form can't be used
 // to discover who has an account.
-const GENERIC_SENT = 'If this email has access to TaskHub, a sign-in code is on its way.';
+const GENERIC_SENT = 'If this email has access to Tasks Manager, a sign-in code is on its way.';
 
 function googleConfigured() {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);

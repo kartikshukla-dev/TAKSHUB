@@ -1,4 +1,4 @@
-# TaskHub
+# Tasks Manager
 
 Internal JIRA-style task management prototype — projects, Kanban boards, tasks with
 comments/labels/attachments/activity logs, email notifications, and live updates.
