@@ -15,7 +15,7 @@ async function start() {
 
   const port = process.env.PORT || 5000;
   httpServer.listen(port, () => {
-    console.log(`[server] TaskHub API listening on port ${port}`);
+    console.log(`[server] Tasks Manager API listening on port ${port}`);
   });
 }
 

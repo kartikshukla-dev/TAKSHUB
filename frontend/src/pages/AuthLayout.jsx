@@ -8,7 +8,7 @@ export const GOOGLE_ERRORS = {
   google_failed: 'Google sign-in failed. Please try again.',
   google_cancelled: 'Google sign-in was cancelled.',
   google_no_email: 'Your Google account did not share an email address.',
-  google_not_invited: 'This Google account has not been invited to TaskHub. Ask your team head for an invite.',
+  google_not_invited: 'This Google account has not been invited to Tasks Manager. Ask your team head for an invite.',
   google_disabled: 'This account has been disabled. Contact your Super Admin.',
 };
 

@@ -20,6 +20,18 @@ function env(name) {
   return (process.env[name] || '').trim();
 }
 
+// Gmail / Google Workspace via OAuth2 (no password stored): the client id,
+// secret and refresh token come from Google Cloud + OAuth Playground.
+// Nodemailer swaps the refresh token for fresh access tokens by itself.
+function oauthReady() {
+  return Boolean(env('SMTP_USER') && env('GMAIL_CLIENT_ID') && env('GMAIL_CLIENT_SECRET') && env('GMAIL_REFRESH_TOKEN'));
+}
+
+function smtpReady() {
+  if (oauthReady()) return true;
+  return Boolean(env('SMTP_HOST') && env('SMTP_USER') && env('SMTP_PASS'));
+}
+
 function detectProvider() {
   if (injected) return 'smtp';
   // Jest sets NODE_ENV=test and tests load the real .env; never send real
@@ -28,8 +40,10 @@ function detectProvider() {
   const ready = {
     resend: Boolean(env('RESEND_API_KEY')),
     brevo: Boolean(env('BREVO_API_KEY')),
-    smtp: Boolean(env('SMTP_HOST') && env('SMTP_USER') && env('SMTP_PASS')),
+    smtp: smtpReady(),
   };
+  // EMAIL_PROVIDER=gmail is an alias for the SMTP/Nodemailer provider.
+  if (env('EMAIL_PROVIDER').toLowerCase() === 'gmail') return ready.smtp ? 'smtp' : null;
   // An explicit choice only counts once its credentials are filled in, so a
   // half-configured .env falls back to "not configured" instead of erroring.
   const explicit = env('EMAIL_PROVIDER').toLowerCase();
@@ -38,7 +52,7 @@ function detectProvider() {
 }
 
 function fromAddress() {
-  return env('EMAIL_FROM') || env('SMTP_FROM') || 'TaskHub <no-reply@oncarecancer.com>';
+  return env('EMAIL_FROM') || env('SMTP_FROM') || 'Tasks Manager <info@oncarecancer.com>';
 }
 
 // "Name <email>" -> { name, email }
@@ -55,13 +69,27 @@ function recipients(to) {
 
 function getTransporter() {
   if (transporter) return transporter;
-  if (!(env('SMTP_HOST') && env('SMTP_USER') && env('SMTP_PASS'))) return null;
-  const port = Number(env('SMTP_PORT')) || 587;
+  if (!smtpReady()) return null;
+  const oauth = oauthReady();
+  // OAuth2 implies Gmail; otherwise any SMTP host (Gmail app password,
+  // Outlook, ...). Gmail: smtp.gmail.com, port 465.
+  const host = env('SMTP_HOST') || 'smtp.gmail.com';
+  const port = Number(env('SMTP_PORT')) || (oauth ? 465 : 587);
   transporter = nodemailer.createTransport({
-    host: env('SMTP_HOST'),
+    host,
     port,
     secure: port === 465,
-    auth: { user: env('SMTP_USER'), pass: env('SMTP_PASS') },
+    auth: oauth
+      ? {
+          type: 'OAuth2',
+          user: env('SMTP_USER'),
+          clientId: env('GMAIL_CLIENT_ID'),
+          clientSecret: env('GMAIL_CLIENT_SECRET'),
+          refreshToken: env('GMAIL_REFRESH_TOKEN'),
+        }
+      : { user: env('SMTP_USER'), pass: env('SMTP_PASS') },
+    pool: true,
+    maxConnections: 3,
     // Fail fast when the host blocks SMTP (Render free blocks 25/465/587)
     // instead of hanging the sign-in request.
     connectionTimeout: 15000,
@@ -102,7 +130,7 @@ async function postJson(url, headers, body) {
 const PROVIDERS = {
   async smtp({ from, to, subject, html, text }) {
     const transport = getTransporter();
-    if (!transport) throw new Error('SMTP is not configured (SMTP_HOST, SMTP_USER, SMTP_PASS)');
+    if (!transport) throw new Error('SMTP is not configured (SMTP_USER + SMTP_PASS, or Gmail OAuth2 vars)');
     return transport.sendMail({ from, to: to.join(','), subject, html, text });
   },
 
@@ -167,7 +195,7 @@ function status() {
     configured: Boolean(provider),
     from: fromAddress(),
     available: {
-      smtp: Boolean(env('SMTP_HOST') && env('SMTP_USER') && env('SMTP_PASS')),
+      smtp: smtpReady(),
       resend: Boolean(env('RESEND_API_KEY')),
       brevo: Boolean(env('BREVO_API_KEY')),
     },
