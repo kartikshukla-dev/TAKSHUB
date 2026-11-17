@@ -8,7 +8,7 @@ import { Avatar, Modal, Toggle } from './ui';
 import Icon from './Icon';
 
 export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
-  const { userId, isAdmin, canManageTeam } = useAuth();
+  const { userId, isAdmin, canManageTeam, canPlanTeamTask } = useAuth();
   const { users } = useUsers();
   const { departments } = useDepartments();
   const [task, setTask] = useState(initialTask);
@@ -145,7 +145,7 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
   const fromTeamId = idOf(task.fromTeam);
   const isReporter = idOf(task.reporter) === userId;
   // On a team task only that team's head (or a Super Admin) plans it.
-  const canPlan = !toTeamId || canManageTeam(toTeamId);
+  const canPlan = !toTeamId || canPlanTeamTask(toTeamId, fromTeamId);
   const canRoute = isAdmin || isReporter || canManageTeam(toTeamId);
   const canDelete = isAdmin || isReporter || canManageTeam(toTeamId) || canManageTeam(fromTeamId);
   const pickable = toTeamId ? users.filter((u) => idOf(u.department) === toTeamId) : users;

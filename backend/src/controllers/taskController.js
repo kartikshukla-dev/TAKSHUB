@@ -7,7 +7,7 @@ const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { diffTaskFields } = require('../utils/taskDiff');
 const { canViewTask, assertCanViewProject } = require('../utils/access');
-const { idStr, sameId, isSuperAdmin, isHeadOf, canManageTeamTask, headsOf } = require('../utils/teams');
+const { idStr, sameId, isSuperAdmin, isHeadOf, canPlanTeamTask, headsOf } = require('../utils/teams');
 const { buildTaskFilter, sortTasks, TASK_POPULATE, USER_FIELDS } = require('../utils/taskQuery');
 const emails = require('../services/emailService');
 const { formatDate } = require('../services/emailTemplates');
@@ -136,7 +136,9 @@ const createTask = catchAsync(async (req, res) => {
   if (!projectId && !team) throw new ApiError(400, 'Pick a project or a team to send this task to');
   const project = projectId ? await loadProject(projectId, req.user) : await requestsProject(req.user);
 
-  if (team && !canManageTeamTask(req.user, team._id)) {
+  // A task the creator's own team keeps can be assigned directly; one sent
+  // to another team waits for that team's head.
+  if (team && !canPlanTeamTask(req.user, team._id, req.user.department)) {
     if (assignee) throw new ApiError(403, `Only the ${team.name} head can assign this task`);
     if (dueDate) throw new ApiError(403, `Only the ${team.name} head can set the deadline`);
   }
@@ -176,14 +178,20 @@ const createTask = catchAsync(async (req, res) => {
   if (team) {
     const heads = await headsOf([team._id]);
     const headIds = heads.map((h) => h._id).filter((id) => !sameId(id, req.user._id));
+    // Assigned inside the team without the head: tell the head who got it.
+    const direct = Boolean(populated.assignee) && sameId(populated.fromTeam, team._id);
     notify(headIds, {
       actor: req.user._id,
-      type: 'task_request',
-      text: `${req.user.name} raised ${ref} for ${team.name}: ${task.title}`,
+      type: direct ? 'task_assigned_in_team' : 'task_request',
+      text: direct
+        ? `${req.user.name} assigned ${ref} to ${populated.assignee.name} (${team.name}): ${task.title}`
+        : `${req.user.name} raised ${ref} for ${team.name}: ${task.title}`,
       link,
     });
     const to = await emailable(headIds);
-    emails.sendTaskRequestEmail({ task: populated, project, actor: req.user, recipients: to }).catch(logEmailError('team-request'));
+    emails
+      .sendTaskRequestEmail({ task: populated, project, actor: req.user, recipients: to, direct })
+      .catch(logEmailError('team-request'));
   }
 
   if (populated.assignee && !sameId(populated.assignee._id, req.user._id)) {
@@ -281,7 +289,9 @@ const updateTask = catchAsync(async (req, res) => {
   }
 
   if (team) {
-    const canManage = canManageTeamTask(user, team._id);
+    // fromTeam never changes, so "stays inside the team" is checked on the
+    // (possibly new) target team.
+    const canManage = canPlanTeamTask(user, team._id, task.fromTeam);
     const assigneeChanged = 'assignee' in updates && !sameId(updates.assignee, task.assignee) && !(updates.assignee === null && !task.assignee);
     const deadlineChanged = 'dueDate' in updates && !sameDate(updates.dueDate, task.dueDate);
     // Clearing the assignee as part of a re-route is allowed.

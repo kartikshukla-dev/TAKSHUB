@@ -364,7 +364,8 @@ function roleChanged({ user, changedBy, team, previousRole }) {
 // ---------- task templates ----------
 
 // Sent to the heads of the team a task was raised to.
-function taskRequest({ task, project, actor, recipient }) {
+function taskRequest({ task, project, actor, recipient, direct = false }) {
+  if (direct) return taskAssignedInTeam({ task, project, actor, recipient });
   const link = taskLink(task, project);
   const to = teamName(task.toTeam) || 'your team';
   const from = teamName(task.fromTeam);
@@ -392,6 +393,34 @@ function taskRequest({ task, project, actor, recipient }) {
   };
 }
 
+// Team head FYI: a member assigned a task inside their own team directly.
+function taskAssignedInTeam({ task, project, actor, recipient }) {
+  const link = taskLink(task, project);
+  const team = teamName(task.toTeam) || 'your team';
+  const who = task.assignee?.name || 'someone';
+  const by = actor?.name || 'Someone';
+  const html = layout({
+    preheader: `${by} assigned ${task.title} to ${who} in ${team}`,
+    heading: `New task in ${team}`,
+    body: [
+      paragraph(`Hi ${esc(firstName(recipient))}, <strong>${esc(by)}</strong> assigned a task to <strong>${esc(who)}</strong> inside ${esc(team)}.`),
+      spacer(16),
+      banner('info', 'For your information. No action needed unless you want to change it.'),
+      taskCard(task, project, [
+        ['Assigned by', esc(by)],
+        ['Assigned to', esc(who)],
+        ['Created', esc(formatDate(task.createdAt || new Date()))],
+      ]),
+      cta('View task', link),
+    ].join(''),
+    footerNote: `You're receiving this because you're a head of ${esc(team)}.`,
+  });
+  return {
+    subject: `${subjectPrefix(task, project)} ${by} assigned to ${who}: ${task.title}`,
+    html,
+    text: `${by} assigned a task to ${who} in ${team}.\n\n${textCard(task, project)}\n\nView task: ${link}`,
+  };
+}
 // "Assigned to you" (new task or reassignment).
 function taskAssigned({ task, project, assignee, reporter, actor, eventLabel = 'New task assigned to you', eventTime }) {
   const by = actor || reporter;
