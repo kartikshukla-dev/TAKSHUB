@@ -257,8 +257,8 @@ async function sendEach(recipients, build) {
   return Promise.all(list.map((r) => sendQuietly('notification', { to: r.email, ...build(r) })));
 }
 
-async function sendTaskRequestEmail({ task, project, actor, recipients }) {
-  return sendEach(recipients, (recipient) => templates.taskRequest({ task, project, actor, recipient }));
+async function sendTaskRequestEmail({ task, project, actor, recipients, direct = false }) {
+  return sendEach(recipients, (recipient) => templates.taskRequest({ task, project, actor, recipient, direct }));
 }
 
 async function sendTaskUpdatedEmail({ task, project, actor, changes, recipients }) {

@@ -79,6 +79,11 @@ export function AuthProvider({ children }) {
   const departmentId = user?.department ? String(user.department._id || user.department) : null;
   // Super Admin, or head of the given team.
   const canManageTeam = (teamId) => isAdmin || (isHead && Boolean(teamId) && String(teamId) === departmentId);
+  // Mirrors backend canPlanTeamTask: head/admin always; any member of the
+  // team when the task stays inside it (raised by and sent to that team).
+  const canPlanTeamTask = (toTeam, fromTeam) =>
+    canManageTeam(toTeam) ||
+    (Boolean(departmentId) && String(toTeam || '') === departmentId && String(fromTeam || '') === departmentId);
 
   return (
     <AuthContext.Provider
@@ -97,6 +102,7 @@ export function AuthProvider({ children }) {
         isStaff,
         departmentId,
         canManageTeam,
+        canPlanTeamTask,
       }}
     >
       {children}

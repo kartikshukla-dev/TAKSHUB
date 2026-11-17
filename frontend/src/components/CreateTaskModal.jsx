@@ -9,7 +9,7 @@ import { Modal } from './ui';
 // `defaults` can pre-fill project / assignee / status / toTeam (e.g. from a
 // project page, a team page or a member page).
 export default function CreateTaskModal({ defaults = {}, onClose, onCreated }) {
-  const { departmentId, canManageTeam } = useAuth();
+  const { departmentId, canManageTeam, canPlanTeamTask } = useAuth();
   const { users } = useUsers();
   const { projects } = useProjects();
   const { departments } = useDepartments();
@@ -26,8 +26,10 @@ export default function CreateTaskModal({ defaults = {}, onClose, onCreated }) {
   const [submitting, setSubmitting] = useState(false);
 
   const team = departments.find((d) => d._id === toTeam);
-  // Sending to a team: only its head (or a Super Admin) picks the assignee and deadline.
-  const canPlan = !toTeam || canManageTeam(toTeam);
+  // Another team: only its head (or a Super Admin) picks the assignee and
+  // deadline. My own team: I can assign directly; the head sees who got it.
+  const canPlan = !toTeam || canPlanTeamTask(toTeam, departmentId);
+  const directInTeam = Boolean(toTeam) && toTeam === departmentId && !canManageTeam(toTeam);
   const pickable = useMemo(
     () => (toTeam ? users.filter((u) => idOf(u.department) === toTeam) : users),
     [users, toTeam]
@@ -154,6 +156,14 @@ export default function CreateTaskModal({ defaults = {}, onClose, onCreated }) {
                 <label htmlFor="task-due">Deadline</label>
                 <input id="task-due" className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
               </div>
+              {directInTeam && (
+                <div className="field field-span">
+                  <div className="hint-box">
+                    This stays in your team, so you can assign it directly.
+                    {team?.heads?.length ? ` ${team.heads.map((h) => h.name).join(', ')} will see who it went to.` : ''}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="field field-span">
