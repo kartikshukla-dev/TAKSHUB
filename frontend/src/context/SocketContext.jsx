@@ -15,7 +15,10 @@ export function SocketProvider({ children }) {
     const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
     // The token puts this socket in the user's personal room on the server
     // (chat, notifications, task updates).
-    const s = io(socketUrl, { transports: ['websocket'], auth: { token } });
+    // Start on HTTP long-polling and upgrade to WebSocket when the proxy
+    // allows it. Forcing websocket-only meant no live updates at all behind
+    // a proxy that doesn't pass the Upgrade header.
+    const s = io(socketUrl, { transports: ['polling', 'websocket'], auth: { token } });
     socketRef.current = s;
     setSocket(s);
 
