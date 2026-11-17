@@ -18,7 +18,8 @@ function createApp() {
   app.use(cors({ origin: require('./utils/frontendUrls').corsOrigin(), credentials: true }));
   // gzip JSON replies (task lists shrink ~5-10x over the wire).
   app.use(compression({ threshold: 1024 }));
-  app.use(express.json());
+  // 1 MB: chat code snippets can be up to 200k characters.
+  app.use(express.json({ limit: '1mb' }));
   app.use(passport.initialize());
 
   require('./config/passport')(passport);

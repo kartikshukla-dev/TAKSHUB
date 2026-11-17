@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { useSocketEvent } from './SocketContext';
+import { useSocket, useSocketEvent } from './SocketContext';
 import * as ws from '../api/workspace';
 
 // Live, app-wide state fed by the socket: notifications, chat unread count,
@@ -42,6 +42,8 @@ export function LiveProvider({ children }) {
   const [pushEnabled, setPushEnabledState] = useState(() => localStorage.getItem(PUSH_KEY) === 'on');
   const [soundEnabled, setSoundEnabledState] = useState(() => localStorage.getItem(SOUND_KEY) !== 'off');
   const activeConversationRef = useRef(null);
+  const { socket } = useSocket();
+  const [presence, setPresence] = useState({});
 
   const refreshNotifications = useCallback(async () => {
     if (!user) return;
@@ -58,7 +60,7 @@ export function LiveProvider({ children }) {
     if (!user) return;
     try {
       const convs = await ws.listConversations();
-      setChatUnread(convs.reduce((sum, c) => sum + (c.unread || 0), 0));
+      setChatUnread(convs.reduce((sum, c) => sum + (c.muted ? 0 : c.unread || 0), 0));
     } catch {
       /* ignore */
     }
@@ -89,15 +91,50 @@ export function LiveProvider({ children }) {
     popUp('Tasks Manager', n.text, n.link);
   });
 
-  useSocketEvent('chat:message', ({ conversationId, conversationName, message }) => {
+  useSocketEvent('chat:message', ({ conversationId, conversationName, conversationType, mutedBy = [], message }) => {
     const fromMe = String(message.sender?._id) === userId;
     if (fromMe) return;
+    const mentioned = message.mentionAll || (message.mentions || []).map(String).includes(userId);
+    // Muted chats stay quiet unless you're @mentioned. Thread replies don't
+    // count towards the unread badge (they show on the thread instead).
+    const muted = mutedBy.map(String).includes(userId) && !mentioned;
     const viewing = location.pathname.startsWith('/chat') && activeConversationRef.current === String(conversationId);
-    if (!viewing) setChatUnread((c) => c + 1);
+    if (!viewing && !muted && !message.parent) setChatUnread((c) => c + 1);
+    if (muted) return;
     if (soundEnabled) playPing();
-    const title = conversationName ? `${message.sender?.name} in ${conversationName}` : message.sender?.name;
-    popUp(title || 'New message', message.text, `/chat?c=${conversationId}`);
+    const where = conversationName ? `${conversationType === 'channel' ? '#' : ''}${conversationName}` : '';
+    const title = where ? `${message.sender?.name} in ${where}` : message.sender?.name;
+    popUp(title || 'New message', message.text || (message.snippet ? 'Shared a snippet' : 'Shared a file'), `/chat?c=${conversationId}`);
   });
+
+  // Who's online: initial snapshot + live changes. Hidden tab = "away".
+  useEffect(() => {
+    if (!user) return;
+    ws.getPresence().then(setPresence).catch(() => {});
+  }, [user]);
+  useSocketEvent('presence', ({ userId: uid, status }) => {
+    setPresence((prev) => {
+      const next = { ...prev };
+      if (status === 'offline') delete next[uid];
+      else next[uid] = status;
+      return next;
+    });
+  });
+  useEffect(() => {
+    if (!socket) return undefined;
+    const report = () => socket.emit('presence:away', document.hidden);
+    const onConnect = () => {
+      report();
+      ws.getPresence().then(setPresence).catch(() => {});
+    };
+    document.addEventListener('visibilitychange', report);
+    socket.on('connect', onConnect);
+    if (socket.connected) report();
+    return () => {
+      document.removeEventListener('visibilitychange', report);
+      socket.off('connect', onConnect);
+    };
+  }, [socket]);
 
   const markAllRead = async () => {
     await ws.markAllNotificationsRead();
@@ -147,6 +184,7 @@ export function LiveProvider({ children }) {
         setPushEnabled,
         soundEnabled,
         setSoundEnabled,
+        presence,
       }}
     >
       {children}
