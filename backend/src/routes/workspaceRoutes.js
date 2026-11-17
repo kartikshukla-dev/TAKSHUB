@@ -12,13 +12,14 @@ const {
   deleteDepartment,
 } = require('../controllers/departmentController');
 const { listTodos, createTodo, updateTodo, deleteTodo } = require('../controllers/todoController');
-const {
-  listConversations,
-  createConversation,
-  listMessages,
-  sendMessage,
-  markConversationRead,
-} = require('../controllers/chatController');
+const multer = require('multer');
+const chat = require('../controllers/chatController');
+
+// Chat attachments: up to 5 files of 10 MB each (same per-file limit as tasks).
+const chatUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 5, fieldSize: 1024 * 1024 },
+});
 const { listNotifications, markRead, markAllRead } = require('../controllers/notificationController');
 const { search } = require('../controllers/searchController');
 const emailAdmin = require('../controllers/emailController');
@@ -61,11 +62,29 @@ router.post('/todos', createTodo);
 router.patch('/todos/:id', updateTodo);
 router.delete('/todos/:id', deleteTodo);
 
-router.get('/chat/conversations', listConversations);
-router.post('/chat/conversations', createConversation);
-router.get('/chat/conversations/:id/messages', listMessages);
-router.post('/chat/conversations/:id/messages', sendMessage);
-router.post('/chat/conversations/:id/read', markConversationRead);
+router.get('/chat/conversations', chat.listConversations);
+router.post('/chat/conversations', chat.createConversation);
+router.patch('/chat/conversations/:id', chat.updateConversation);
+router.post('/chat/conversations/:id/members', chat.addMembers);
+router.delete('/chat/conversations/:id/members/:userId', chat.removeMember);
+router.post('/chat/conversations/:id/join', chat.joinChannel);
+router.post('/chat/conversations/:id/mute', chat.muteConversation);
+router.post('/chat/conversations/:id/star', chat.starConversation);
+router.get('/chat/conversations/:id/messages', chat.listMessages);
+router.post('/chat/conversations/:id/messages', chatUpload.array('files', 5), chat.sendMessage);
+router.get('/chat/conversations/:id/pins', chat.listPins);
+router.post('/chat/conversations/:id/read', chat.markConversationRead);
+router.get('/chat/channels', chat.listChannels);
+router.get('/chat/saved', chat.listSaved);
+router.get('/chat/search', chat.searchMessages);
+router.get('/chat/presence', chat.presence);
+router.get('/chat/messages/:mid/thread', chat.getThread);
+router.patch('/chat/messages/:mid', chat.editMessage);
+router.delete('/chat/messages/:mid', chat.deleteMessage);
+router.post('/chat/messages/:mid/reactions', chat.reactToMessage);
+router.post('/chat/messages/:mid/pin', chat.pinMessage);
+router.post('/chat/messages/:mid/save', chat.saveMessage);
+router.get('/chat/messages/:mid/files/:fileId', chat.downloadFile);
 
 router.get('/notifications', listNotifications);
 router.post('/notifications/read-all', markAllRead);

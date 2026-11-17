@@ -8,6 +8,17 @@ function errorHandler(err, req, res, next) { // eslint-disable-line no-unused-va
   if (err.name === 'CastError') {
     return res.status(400).json({ message: 'Invalid id format' });
   }
+  if (err.name === 'MulterError') {
+    const messages = {
+      LIMIT_FILE_SIZE: 'Each file must be 10 MB or smaller',
+      LIMIT_FILE_COUNT: 'You can attach up to 5 files at once',
+      LIMIT_FIELD_VALUE: 'Message is too long',
+    };
+    return res.status(400).json({ message: messages[err.code] || 'Upload failed' });
+  }
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ message: 'Message is too large' });
+  }
   if (err.code === 11000) {
     return res.status(409).json({ message: 'Duplicate value', field: Object.keys(err.keyPattern || {})[0] });
   }
