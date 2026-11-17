@@ -3,8 +3,13 @@ import * as tasksApi from '../api/tasks';
 import { useAuth } from '../context/AuthContext';
 import { useUsers, useProjects, useDepartments } from '../hooks/useDirectory';
 import { emitTaskChange } from '../utils/taskEvents';
-import { STATUSES, PRIORITIES, idOf } from '../utils/format';
+import { STATUSES, PRIORITIES, idOf, projectIdOf } from '../utils/format';
 import { Modal } from './ui';
+import Icon from './Icon';
+
+// Same limit as the server (multer, 10 MB per file).
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const fileSize = (n) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
 // `defaults` can pre-fill project / assignee / status / toTeam (e.g. from a
 // project page, a team page or a member page).
@@ -24,6 +29,21 @@ export default function CreateTaskModal({ defaults = {}, onClose, onCreated }) {
   const [labelsInput, setLabelsInput] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [files, setFiles] = useState([]);
+  const [progress, setProgress] = useState('');
+  // Set when the task was created but some files failed: no second submit.
+  const [createdTask, setCreatedTask] = useState(null);
+
+  const addFiles = (list) => {
+    const picked = Array.from(list || []);
+    const tooBig = picked.filter((f) => f.size > MAX_FILE_BYTES);
+    setError(tooBig.length ? `${tooBig.map((f) => f.name).join(', ')} is over 10 MB and was not added.` : '');
+    setFiles((prev) => {
+      const seen = new Set(prev.map((f) => `${f.name}:${f.size}`));
+      return [...prev, ...picked.filter((f) => f.size <= MAX_FILE_BYTES && !seen.has(`${f.name}:${f.size}`))];
+    });
+  };
+  const removeFile = (i) => setFiles((prev) => prev.filter((_, idx) => idx !== i));
 
   const team = departments.find((d) => d._id === toTeam);
   // Another team: only its head (or a Super Admin) picks the assignee and
@@ -66,14 +86,35 @@ export default function CreateTaskModal({ defaults = {}, onClose, onCreated }) {
         payload.assignee = assignee || null;
         payload.dueDate = dueDate || null;
       }
-      const task = await tasksApi.createTask(projectId || null, payload);
+      let task = await tasksApi.createTask(projectId || null, payload);
       emitTaskChange(task, 'created');
+
+      // Files go onto the task right after it exists (same API as the task
+      // modal's "Attach file").
+      const failed = [];
+      for (let i = 0; i < files.length; i += 1) {
+        setProgress(`Uploading ${i + 1} of ${files.length}…`);
+        try {
+          task = await tasksApi.uploadAttachment(projectIdOf(task), task._id, files[i]);
+        } catch {
+          failed.push(files[i].name);
+        }
+      }
+      setProgress('');
+      if (files.length) emitTaskChange(task);
       onCreated?.(task);
+
+      if (failed.length) {
+        setCreatedTask(task);
+        setError(`Task created, but ${failed.join(', ')} could not be attached. Open the task and use "Attach file" to try again.`);
+        return;
+      }
       onClose();
     } catch (err) {
       setError(err.response?.data?.message || 'Could not create task');
     } finally {
       setSubmitting(false);
+      setProgress('');
     }
   };
 
@@ -84,12 +125,20 @@ export default function CreateTaskModal({ defaults = {}, onClose, onCreated }) {
       onClose={onClose}
       footer={
         <>
-          <button type="button" className="btn btn-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" form="create-task-form" className="btn btn-primary" disabled={submitting}>
-            {submitting ? 'Creating…' : toTeam && !canPlan ? `Send to ${team?.name || 'team'}` : 'Create task'}
-          </button>
+          {createdTask ? (
+            <button type="button" className="btn btn-primary" onClick={onClose}>
+              Close
+            </button>
+          ) : (
+            <>
+              <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>
+                Cancel
+              </button>
+              <button type="submit" form="create-task-form" className="btn btn-primary" disabled={submitting}>
+                {submitting ? progress || 'Creating…' : toTeam && !canPlan ? `Send to ${team?.name || 'team'}` : 'Create task'}
+              </button>
+            </>
+          )}
         </>
       }
     >
@@ -201,6 +250,48 @@ export default function CreateTaskModal({ defaults = {}, onClose, onCreated }) {
             <input id="task-labels" className="input" value={labelsInput} placeholder="comma separated" onChange={(e) => setLabelsInput(e.target.value)} />
           </div>
         </div>
+        <div className="field">
+          <div className="section-head">
+            <label htmlFor="task-files">Attachments</label>
+            <label className="btn btn-secondary btn-sm">
+              <Icon name="paperclip" size={14} /> Attach files
+              <input
+                id="task-files"
+                type="file"
+                multiple
+                hidden
+                disabled={submitting || Boolean(createdTask)}
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          </div>
+          {files.length === 0 ? (
+            <p className="muted small">Optional. Up to 10 MB per file. You can also add files later from the task.</p>
+          ) : (
+            <ul className="attach-list">
+              {files.map((f, i) => (
+                <li key={`${f.name}:${f.size}`}>
+                  <Icon name="paperclip" size={14} />
+                  <span className="attach-name">{f.name}</span>
+                  <span className="muted small">{fileSize(f.size)}</span>
+                  <button
+                    type="button"
+                    className="icon-btn icon-btn-sm"
+                    onClick={() => removeFile(i)}
+                    disabled={submitting}
+                    aria-label={`Remove ${f.name}`}
+                  >
+                    <Icon name="x" size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         {toTeam && team && !team.heads?.length && (
           <p className="alert alert-error small">{team.name} has no Team Head yet. A Super Admin will need to assign it.</p>
         )}
