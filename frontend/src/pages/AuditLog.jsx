@@ -1,5 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import * as ws from '../api/workspace';
+import RequestLogs from './RequestLogs';
 import Icon from '../components/Icon';
 import { PageHeader } from '../components/ui';
 import { formatDateTime, timeAgo } from '../utils/format';
@@ -43,6 +45,8 @@ function browserOf(ua = '') {
 }
 
 export default function AuditLog() {
+  const [search, setSearch] = useSearchParams();
+  const tab = search.get('tab') === 'requests' ? 'requests' : 'activity';
   const [filters, setFilters] = useState(EMPTY);
   const [page, setPage] = useState(1);
   const [data, setData] = useState(null);
@@ -110,11 +114,35 @@ export default function AuditLog() {
         title="Audit log"
         subtitle={`Every change, sign-in, download and email, with who, when and from where. Read-only. Kept for ${data?.retentionDays || 365} days.`}
         actions={
-          <button type="button" className="btn btn-secondary" onClick={download} disabled={exporting}>
-            <Icon name="download" size={15} /> {exporting ? 'Exporting…' : 'Export CSV'}
-          </button>
+          tab === 'activity' && (
+            <button type="button" className="btn btn-secondary" onClick={download} disabled={exporting}>
+              <Icon name="download" size={15} /> {exporting ? 'Exporting…' : 'Export CSV'}
+            </button>
+          )
         }
       />
+      <div className="tabs audit-tabs" role="tablist">
+        {[
+          ['activity', 'Activity'],
+          ['requests', 'Requests'],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            className={`tab ${tab === id ? 'tab-active' : ''}`}
+            onClick={() => setSearch(id === 'activity' ? {} : { tab: id })}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'requests' ? (
+        <RequestLogs />
+      ) : (
+        <>
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="filter-bar audit-filters">
@@ -277,6 +305,8 @@ export default function AuditLog() {
             Older <Icon name="chevronRight" size={14} />
           </button>
         </div>
+      )}
+        </>
       )}
     </div>
   );

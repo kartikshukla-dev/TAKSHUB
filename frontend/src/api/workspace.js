@@ -63,6 +63,9 @@ export const markAllNotificationsRead = () => apiClient.post('/notifications/rea
 
 export const getEmailStatus = () => apiClient.get('/admin/email/status').then((r) => r.data);
 export const sendTestEmail = (to) => apiClient.post('/admin/email/test', { to }).then((r) => r.data);
+export const listRequests = (params = {}) => apiClient.get('/admin/requests', { params }).then((r) => r.data);
+export const exportRequests = (params = {}) =>
+  apiClient.get('/admin/requests/export', { params, responseType: 'blob' }).then((r) => r.data);
 export const listAudit = (params = {}) => apiClient.get('/admin/audit', { params }).then((r) => r.data);
 export const auditFacets = () => apiClient.get('/admin/audit/facets').then((r) => r.data);
 export const exportAudit = (params = {}) =>

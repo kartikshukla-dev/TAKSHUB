@@ -3,6 +3,7 @@ const cors = require('cors');
 const passport = require('passport');
 const compression = require('compression');
 const auditMiddleware = require('./middleware/audit');
+const { requestLogger } = require('./middleware/requestLogger');
 
 const { getConnectionState } = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
@@ -15,6 +16,9 @@ const workspaceRoutes = require('./routes/workspaceRoutes');
 
 function createApp() {
   const app = express();
+  // First, so even requests that fail early (bad JSON, CORS) are logged:
+  // one line in `pm2 logs` + a row in `requestlogs`.
+  app.use(requestLogger());
 
   app.use(cors({ origin: require('./utils/frontendUrls').corsOrigin(), credentials: true }));
   // gzip JSON replies (task lists shrink ~5-10x over the wire).
