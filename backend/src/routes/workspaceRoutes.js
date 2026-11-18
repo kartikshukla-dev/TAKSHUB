@@ -101,5 +101,7 @@ router.get('/admin/email/preview/:template', admin, emailAdmin.preview);
 router.get('/admin/audit', admin, auditAdmin.listAudit);
 router.get('/admin/audit/facets', admin, auditAdmin.auditFacets);
 router.get('/admin/audit/export', admin, auditAdmin.exportAudit);
+router.get('/admin/requests', admin, auditAdmin.listRequests);
+router.get('/admin/requests/export', admin, auditAdmin.exportRequests);
 
 module.exports = router;

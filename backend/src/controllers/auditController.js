@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const AuditLog = require('../models/AuditLog');
+const RequestLog = require('../models/RequestLog');
 const catchAsync = require('../utils/catchAsync');
 
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -78,4 +79,62 @@ const auditFacets = catchAsync(async (req, res) => {
   res.status(200).json({ actions: actions.sort(), actors: actors.map((a) => ({ _id: a._id, name: a.name, email: a.email })) });
 });
 
-module.exports = { listAudit, exportAudit, auditFacets, buildFilter };
+// ---------- request logs (morgan) ----------
+// Filters: user, method, status ("2xx" / "4xx" / "5xx" / exact), slow (ms),
+// from / to, q (path, IP, email, browser).
+function buildRequestFilter(query) {
+  const f = {};
+  if (query.user && mongoose.Types.ObjectId.isValid(query.user)) f.user = query.user;
+  if (query.method) f.method = String(query.method).toUpperCase();
+  if (query.status) {
+    const s = String(query.status);
+    if (/^[1-5]xx$/.test(s)) {
+      const base = Number(s[0]) * 100;
+      f.status = { $gte: base, $lt: base + 100 };
+    } else if (/^\d{3}$/.test(s)) f.status = Number(s);
+  }
+  if (query.slow && Number(query.slow) > 0) f.ms = { $gte: Number(query.slow) };
+  if (query.from || query.to) {
+    f.at = {};
+    if (query.from) f.at.$gte = new Date(query.from);
+    if (query.to) {
+      const to = new Date(query.to);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(query.to))) to.setHours(23, 59, 59, 999);
+      f.at.$lte = to;
+    }
+  }
+  if (query.q) {
+    const rx = new RegExp(escapeRegex(String(query.q).slice(0, 100)), 'i');
+    f.$or = [{ path: rx }, { ip: rx }, { userEmail: rx }, { userName: rx }, { userAgent: rx }];
+  }
+  return f;
+}
+
+// GET /api/admin/requests?page=&limit=&...filters
+const listRequests = catchAsync(async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const filter = buildRequestFilter(req.query);
+  const [logs, total] = await Promise.all([
+    RequestLog.find(filter).sort({ at: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+    RequestLog.countDocuments(filter),
+  ]);
+  res.status(200).json({ logs, total, page, pages: Math.max(1, Math.ceil(total / limit)), retentionDays: RequestLog.RETENTION_DAYS });
+});
+
+// GET /api/admin/requests/export (CSV, max 100k rows)
+const exportRequests = catchAsync(async (req, res) => {
+  const filter = buildRequestFilter(req.query);
+  const cols = ['at', 'method', 'path', 'query', 'status', 'ms', 'bytes', 'userName', 'userEmail', 'userRole', 'ip', 'userAgent', 'referrer'];
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="request-log-${new Date().toISOString().slice(0, 10)}.csv"`);
+  res.write(`\ufeff${cols.join(',')}\n`);
+  const cursor = RequestLog.find(filter).sort({ at: -1 }).limit(100000).lean().cursor();
+  // eslint-disable-next-line no-restricted-syntax
+  for await (const row of cursor) {
+    res.write(`${cols.map((c) => csvCell(c === 'at' ? new Date(row.at).toISOString() : row[c])).join(',')}\n`);
+  }
+  res.end();
+});
+
+module.exports = { listAudit, exportAudit, auditFacets, buildFilter, listRequests, exportRequests };
