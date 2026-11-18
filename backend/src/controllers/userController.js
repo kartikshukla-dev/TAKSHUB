@@ -70,6 +70,9 @@ const updateUser = catchAsync(async (req, res) => {
   const self = user._id.equals(req.user._id);
   const previousRole = user.role;
   const previousDept = user.department ? String(user.department) : null;
+  const previousStatus = user.status;
+  const previousName = user.name;
+  const previousTitle = user.jobTitle;
 
   const { role, jobTitle, name, status } = req.body;
   if (role !== undefined) {
@@ -92,6 +95,18 @@ const updateUser = catchAsync(async (req, res) => {
 
   await user.save();
   await user.populate('department', 'name');
+
+  const changes = {};
+  if (user.role !== previousRole) changes.role = { from: previousRole, to: user.role };
+  if (user.status !== previousStatus) changes.status = { from: previousStatus, to: user.status };
+  const deptNow = user.department ? String(user.department._id) : null;
+  if (deptNow !== previousDept) {
+    const before = previousDept ? await Department.findById(previousDept).select('name') : null;
+    changes.team = { from: before ? before.name : null, to: user.department ? user.department.name : null };
+  }
+  if (user.name !== previousName) changes.name = { from: previousName, to: user.name };
+  if (user.jobTitle !== previousTitle) changes.jobTitle = { from: previousTitle, to: user.jobTitle };
+  req.audit = { entity: 'user', entityId: user._id, entityLabel: `${user.name} <${user.email}>`, changes };
 
   const roleChanged = user.role !== previousRole;
   const teamChanged = (user.department ? String(user.department._id) : null) !== previousDept;

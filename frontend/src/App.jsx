@@ -23,6 +23,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const TeamDetail = lazy(() => import('./pages/TeamDetail'));
 const TeamLeads = lazy(() => import('./pages/TeamLeads'));
 const Users = lazy(() => import('./pages/Users'));
+const AuditLog = lazy(() => import('./pages/AuditLog'));
 
 // Warm the most used pages in the background once the app is idle.
 if (typeof window !== 'undefined') {
@@ -77,6 +78,7 @@ function AppRoutes() {
         <Route path="/teams/:id" element={page(<TeamDetail />)} />
         <Route path="/team-leads" element={page(<AdminOnly><TeamLeads /></AdminOnly>)} />
         <Route path="/users" element={page(<AdminOnly><Users /></AdminOnly>)} />
+        <Route path="/audit" element={page(<AdminOnly><AuditLog /></AdminOnly>)} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>

@@ -8,6 +8,7 @@ const {
   googleAuth,
   googleCallback,
   googleFailure,
+  logout,
 } = require('../controllers/authController');
 
 const router = express.Router();
@@ -17,6 +18,7 @@ const router = express.Router();
 router.post('/otp/request', requestCode);
 router.post('/otp/verify', verifyCode);
 router.get('/me', requireAuth, me);
+router.post('/logout', requireAuth, logout);
 router.get('/providers', providers);
 
 router.get('/google', googleAuth);

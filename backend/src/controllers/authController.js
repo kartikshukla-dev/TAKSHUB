@@ -99,6 +99,7 @@ const verifyCode = catchAsync(async (req, res) => {
   if (!user || user.status === 'disabled') throw new ApiError(403, 'This account does not have access');
   await markSignedIn(user);
   await user.populate('department', 'name');
+  req.audit = { actor: user, entity: 'user', entityId: user._id, entityLabel: user.email };
   res.status(200).json({ token: signToken(user), user: user.toSafeJSON() });
 });
 
@@ -130,18 +131,28 @@ const googleCallback = (req, res, next) => {
     if (err) {
       const known = { NO_EMAIL: 'google_no_email', NOT_INVITED: 'google_not_invited', DISABLED: 'google_disabled' };
       if (!known[err.code]) console.error('[auth] Google login failed:', err.message);
+      req.audit = { ok: false, error: err.message, meta: { reason: known[err.code] || 'google_failed' } };
       return loginError(res, known[err.code] || 'google_failed');
     }
-    if (!user) return loginError(res, 'google_cancelled');
+    if (!user) {
+      req.audit = { ok: false, error: 'Cancelled', meta: { reason: 'google_cancelled' } };
+      return loginError(res, 'google_cancelled');
+    }
     try {
       await markSignedIn(user);
     } catch (e) {
       return next(e);
     }
+    req.audit = { actor: user, entity: 'user', entityId: user._id, entityLabel: user.email };
     return res.redirect(`${frontendUrl()}/oauth/callback#token=${encodeURIComponent(signToken(user))}`);
   })(req, res, next);
 };
 
 const googleFailure = (req, res) => loginError(res, 'google_failed');
 
-module.exports = { requestCode, verifyCode, me, providers, googleAuth, googleCallback, googleFailure };
+// POST /api/auth/logout : tokens are stateless, so this only records it.
+const logout = (req, res) => {
+  res.status(204).end();
+};
+
+module.exports = { requestCode, verifyCode, me, providers, googleAuth, googleCallback, googleFailure, logout };

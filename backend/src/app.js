@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const passport = require('passport');
 const compression = require('compression');
+const auditMiddleware = require('./middleware/audit');
 
 const { getConnectionState } = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
@@ -20,6 +21,10 @@ function createApp() {
   app.use(compression({ threshold: 1024 }));
   // 1 MB: chat code snippets can be up to 200k characters.
   app.use(express.json({ limit: '1mb' }));
+  // Real client IP for the audit log. Default trusts only a proxy on the
+  // same machine (nginx -> 127.0.0.1), so clients can't fake their IP.
+  app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
+  app.use('/api', auditMiddleware);
   app.use(passport.initialize());
 
   require('./config/passport')(passport);

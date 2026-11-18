@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const templates = require('./emailTemplates');
+const audit = require('./auditService');
 
 /*
  * Email delivery with three interchangeable providers:
@@ -177,7 +178,14 @@ async function sendMail({ to, subject, html, text }) {
     }
     return null;
   }
-  return PROVIDERS[provider]({ from: fromAddress(), to: list, subject, html, text });
+  try {
+    const result = await PROVIDERS[provider]({ from: fromAddress(), to: list, subject, html, text });
+    audit.recordEvent({ action: 'email.sent', category: 'email', summary: subject, meta: { to: list, provider } });
+    return result;
+  } catch (err) {
+    audit.recordEvent({ action: 'email.failed', category: 'email', summary: subject, ok: false, error: err.message, meta: { to: list, provider } });
+    throw err;
+  }
 }
 
 // Fire-and-forget helper for notification emails.

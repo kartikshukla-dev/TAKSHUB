@@ -5379,3 +5379,92 @@ body {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* ---------- Audit log ---------- */
+.audit-filters {
+  flex-wrap: wrap;
+}
+
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.audit-table th,
+.audit-table td {
+  padding: 10px 14px;
+  vertical-align: top;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.audit-table td .cell-stack {
+  gap: 2px;
+}
+
+.audit-when {
+  display: block;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.audit-action {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.audit-on {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.audit-fail {
+  color: var(--destructive);
+  background: var(--destructive-bg);
+}
+
+.audit-detail-row td {
+  background: var(--surface-2);
+}
+
+.audit-detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  padding: 6px 0;
+}
+
+.audit-changes {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.audit-changes code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.audit-from {
+  color: var(--destructive);
+  text-decoration: line-through;
+}
+
+.audit-to {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.audit-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 14px;
+}

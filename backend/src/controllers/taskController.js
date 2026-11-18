@@ -169,6 +169,22 @@ const createTask = catchAsync(async (req, res) => {
 
   const populated = await task.populate(TASK_POPULATE);
   emitTaskEvent(project, populated, 'task:created', populated);
+  req.audit = {
+    entity: 'task',
+    entityId: task._id,
+    entityLabel: `${taskRef(task, project)} ${task.title}`,
+    changes: {
+      created: {
+        title: task.title,
+        priority: task.priority,
+        status: task.status,
+        toTeam: team ? team.name : null,
+        assignee: populated.assignee ? populated.assignee.name : null,
+        dueDate: task.dueDate,
+        project: project.name,
+      },
+    },
+  };
 
   res.status(201).json({ task: populated });
   afterResponse('task-created', async () => {
@@ -305,6 +321,23 @@ const updateTask = catchAsync(async (req, res) => {
   const wasAlreadyDone = task.status === 'done';
   const previousAssignee = idStr(task.assignee);
   const logEntries = diffTaskFields(task, updates, user._id);
+  const auditChanges = Object.fromEntries(logEntries.map((e) => [e.field, { from: e.oldValue, to: e.newValue }]));
+  if ('description' in updates && updates.description !== task.description) {
+    auditChanges.description = { from: task.description || '', to: updates.description || '' };
+  }
+  // Show people and teams by name, not id.
+  const personIds = ['assignee'].flatMap((f) => (auditChanges[f] ? [auditChanges[f].from, auditChanges[f].to] : [])).filter(Boolean);
+  const teamIds = auditChanges.toTeam ? [auditChanges.toTeam.from, auditChanges.toTeam.to].filter((v) => v && mongoose.Types.ObjectId.isValid(String(v))) : [];
+  if (personIds.length || teamIds.length) {
+    const [people, teams] = await Promise.all([
+      personIds.length ? User.find({ _id: { $in: personIds } }).select('name') : [],
+      teamIds.length ? Department.find({ _id: { $in: teamIds } }).select('name') : [],
+    ]);
+    const nameOf = (list, id) => (id ? list.find((x) => sameId(x._id, id))?.name || String(id) : null);
+    if (auditChanges.assignee) auditChanges.assignee = { from: nameOf(people, auditChanges.assignee.from), to: nameOf(people, auditChanges.assignee.to) };
+    if (auditChanges.toTeam) auditChanges.toTeam = { from: nameOf(teams, auditChanges.toTeam.from), to: nameOf(teams, auditChanges.toTeam.to) };
+  }
+  req.audit = { entity: 'task', entityId: task._id, entityLabel: `${taskRef(task, project)} ${task.title}`, changes: auditChanges };
 
   Task.TRACKED_FIELDS.forEach((field) => {
     if (field in updates) task[field] = updates[field];
@@ -394,6 +427,12 @@ const deleteTask = catchAsync(async (req, res) => {
   const allowed =
     isSuperAdmin(req.user) || sameId(task.reporter, req.user._id) || isHeadOf(req.user, task.toTeam) || isHeadOf(req.user, task.fromTeam);
   if (!allowed) throw new ApiError(403, 'Only the person who raised it, a team head or a Super Admin can delete this task');
+  req.audit = {
+    entity: 'task',
+    entityId: task._id,
+    entityLabel: `${taskRef(task, project)} ${task.title}`,
+    changes: { deleted: { title: task.title, status: task.status, assignee: idStr(task.assignee), comments: task.comments.length } },
+  };
   await task.deleteOne();
   emitTaskEvent(project, task, 'task:deleted', { id: task._id });
   res.status(204).send();
