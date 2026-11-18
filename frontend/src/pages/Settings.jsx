@@ -162,7 +162,7 @@ function SoundCard() {
       <div className="setting-row">
         <div>
           <strong>Sound</strong>
-          <span className="muted small">Default is the usual short ping. Meme sounds are fun effects like an air horn or sad trombone.</span>
+          <span className="muted small">Default is the usual short ping. Meme sounds play a meme clip like FAAAH or Kaun hai re (up to 5 seconds).</span>
         </div>
         <div className="sound-pick">
           <select className="input" value={style} onChange={(e) => save(SOUND_STYLE_KEY, e.target.value, setStyle)} aria-label="Sound style" disabled={!soundEnabled}>
