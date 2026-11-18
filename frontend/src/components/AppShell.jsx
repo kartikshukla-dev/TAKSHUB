@@ -54,6 +54,7 @@ function Sidebar({ collapsed, onToggle }) {
     ...(isAdmin ? [{ to: '/team-leads', label: 'Team Leads', icon: 'building' }] : []),
     ...(isHead && departmentId ? [{ to: `/teams/${departmentId}`, label: 'My Team', icon: 'building' }] : []),
     ...(isAdmin ? [{ to: '/users', label: 'Users', icon: 'userCircle' }] : []),
+    ...(isAdmin ? [{ to: '/audit', label: 'Audit log', icon: 'lock' }] : []),
   ];
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>

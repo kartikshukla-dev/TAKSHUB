@@ -4,6 +4,8 @@ import apiClient from './client';
 export const requestOtp = (email) => apiClient.post('/auth/otp/request', { email }).then((r) => r.data);
 export const verifyOtp = (email, code) => apiClient.post('/auth/otp/verify', { email, code }).then((r) => r.data);
 export const fetchMe = () => apiClient.get('/auth/me').then((r) => r.data);
+// Records the sign-out in the audit log; never blocks logging out.
+export const logoutServer = () => apiClient.post('/auth/logout').catch(() => {});
 // Which sign-in methods the server has credentials for, e.g. { google: true }.
 export const getProviders = () => apiClient.get('/auth/providers').then((r) => r.data);
 

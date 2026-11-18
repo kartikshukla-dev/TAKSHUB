@@ -1,6 +1,8 @@
 // Centralized error handler. Any `next(err)` call ends up here.
 function errorHandler(err, req, res, next) { // eslint-disable-line no-unused-vars
   console.error('[error]', err.message);
+  // Picked up by the audit log for failed actions.
+  res.locals.errorMessage = String(err.message || '').slice(0, 300);
 
   if (err.name === 'ValidationError') {
     return res.status(400).json({ message: err.message });

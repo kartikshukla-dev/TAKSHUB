@@ -23,6 +23,7 @@ const chatUpload = multer({
 const { listNotifications, markRead, markAllRead } = require('../controllers/notificationController');
 const { search } = require('../controllers/searchController');
 const emailAdmin = require('../controllers/emailController');
+const auditAdmin = require('../controllers/auditController');
 const { createTask } = require('../controllers/taskController');
 const { invite, resendInvite, revokeInvite } = require('../controllers/userController');
 const { listTeams, getTeam } = require('../controllers/teamController');
@@ -95,5 +96,10 @@ router.get('/search', search);
 router.get('/admin/email/status', admin, emailAdmin.getStatus);
 router.post('/admin/email/test', admin, emailAdmin.sendTest);
 router.get('/admin/email/preview/:template', admin, emailAdmin.preview);
+
+// Audit log: Super Admin only, read-only.
+router.get('/admin/audit', admin, auditAdmin.listAudit);
+router.get('/admin/audit/facets', admin, auditAdmin.auditFacets);
+router.get('/admin/audit/export', admin, auditAdmin.exportAudit);
 
 module.exports = router;

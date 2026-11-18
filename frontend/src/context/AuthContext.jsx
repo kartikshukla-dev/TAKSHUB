@@ -63,7 +63,11 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
-  const logout = () => clearSession();
+  const logout = () => {
+    // Fired before the token is cleared so the server knows who left.
+    if (localStorage.getItem('taskhub_token')) authApi.logoutServer?.();
+    clearSession();
+  };
 
   // Used by Settings after a profile update.
   const updateCurrentUser = (nextUser) => {
