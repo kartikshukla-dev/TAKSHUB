@@ -141,6 +141,13 @@ export function describeActivity(entry) {
       return `${who} created the task`;
     case 'comment':
       return `${who} commented`;
+    case 'subtask':
+    {
+      // newValue reads like "completed: Write notes" or "assigned Neha: QA".
+      const s = String(entry.newValue || '');
+      const i = s.indexOf(': ');
+      return i > 0 ? `${who} ${s.slice(0, i)} subtask “${s.slice(i + 2)}”` : `${who} changed a subtask`;
+    }
     case 'blocked':
       return `${who} marked it ${val(entry.newValue)}`;
     case 'assignee':

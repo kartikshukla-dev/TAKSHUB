@@ -36,6 +36,16 @@ export const uploadAttachment = (projectId, taskId, file) => {
 
 // Downloads through the API client so the auth header is sent, then hands
 // the blob to the browser. A plain <a href> would get a 401.
+const subtaskUrl = (projectId, taskId, sid = '') => `/projects/${projectId}/tasks/${taskId}/subtasks${sid ? `/${sid}` : ''}`;
+export const addSubtask = (projectId, taskId, payload) =>
+  apiClient.post(subtaskUrl(projectId, taskId), payload).then((r) => r.data.task);
+export const updateSubtask = (projectId, taskId, sid, payload) =>
+  apiClient.patch(subtaskUrl(projectId, taskId, sid), payload).then((r) => r.data.task);
+export const deleteSubtask = (projectId, taskId, sid) =>
+  apiClient.delete(subtaskUrl(projectId, taskId, sid)).then((r) => r.data.task);
+export const reorderSubtasks = (projectId, taskId, ids) =>
+  apiClient.put(subtaskUrl(projectId, taskId, 'order'), { ids }).then((r) => r.data.task);
+
 export async function downloadAttachment(projectId, taskId, attachment) {
   const res = await apiClient.get(`/projects/${projectId}/tasks/${taskId}/attachments/${attachment.fileId}`, {
     responseType: 'blob',

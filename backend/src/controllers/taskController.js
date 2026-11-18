@@ -144,6 +144,13 @@ const createTask = catchAsync(async (req, res) => {
   }
   await assertAssigneeInTeam(assignee, team);
 
+  // Optional checklist on create: ["title", ...] or [{ title }].
+  const subtasks = (Array.isArray(req.body.subtasks) ? req.body.subtasks : [])
+    .map((s) => String((s && s.title) || s || '').trim())
+    .filter(Boolean)
+    .slice(0, Task.SUBTASK_MAX);
+  if (subtasks.some((t) => t.length > 300)) throw new ApiError(400, 'Subtask title is too long');
+
   const seq = await Project.findByIdAndUpdate(project._id, { $inc: { taskSeq: 1 } }, { new: true });
 
   const task = await Task.create({
@@ -161,6 +168,7 @@ const createTask = catchAsync(async (req, res) => {
     fromTeam: req.user.department || null,
     toTeam: team ? team._id : null,
     completedAt: status === 'done' ? new Date() : null,
+    subtasks: subtasks.map((t, i) => ({ title: t, order: i, createdBy: req.user._id })),
     activityLog: [
       { field: 'created', oldValue: null, newValue: title, changedBy: req.user._id },
       ...(team ? [{ field: 'toTeam', oldValue: null, newValue: team.name, changedBy: req.user._id }] : []),
@@ -520,7 +528,149 @@ const downloadAttachment = catchAsync(async (req, res) => {
   stream.pipe(res);
 });
 
+// ---------- subtasks ----------
+// Anyone who can see the task can manage its checklist. On a team task the
+// assignee of a subtask must belong to that team (same rule as the task).
+
+const FULL_POPULATE = [
+  ...TASK_POPULATE,
+  { path: 'comments.author', select: USER_FIELDS },
+  { path: 'activityLog.changedBy', select: USER_FIELDS },
+];
+
+async function loadSubtaskTask(req) {
+  const project = await loadProject(req.params.projectId);
+  const task = await loadTask(req, project);
+  return { project, task };
+}
+
+function findSubtask(task, sid) {
+  const sub = task.subtasks.id(sid);
+  if (!sub) throw new ApiError(404, 'Subtask not found');
+  return sub;
+}
+
+async function checkSubtaskAssignee(assignee, task) {
+  if (!assignee) return null;
+  if (!mongoose.Types.ObjectId.isValid(String(assignee))) throw new ApiError(400, 'Invalid assignee');
+  const person = await User.findById(assignee).select('name department status');
+  if (!person || person.status === 'disabled') throw new ApiError(400, 'Assignee not found');
+  if (task.toTeam && !sameId(person.department, task.toTeam)) {
+    const team = await Department.findById(task.toTeam).select('name');
+    throw new ApiError(400, `${person.name} is not in the ${team ? team.name : 'task'} team`);
+  }
+  return person;
+}
+
+function parseDue(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) throw new ApiError(400, 'Invalid deadline');
+  return d;
+}
+
+// Saves, broadcasts, replies, then notifies a newly assigned person.
+async function finishSubtaskChange(req, res, { task, project, assignedTo, subTitle, status = 200 }) {
+  await task.save();
+  const populated = await task.populate(FULL_POPULATE);
+  emitTaskEvent(project, populated, 'task:updated', populated);
+  res.status(status).json({ task: populated });
+  if (assignedTo && !sameId(assignedTo, req.user._id)) {
+    afterResponse('subtask-assigned', async () => {
+      notify([assignedTo], {
+        actor: req.user._id,
+        type: 'subtask_assigned',
+        text: `${req.user.name} assigned you a subtask on ${taskRef(task, project)}: ${subTitle}`,
+        link: taskLink(task, project),
+      });
+    });
+  }
+}
+
+// POST /api/projects/:projectId/tasks/:id/subtasks { title, assignee?, dueDate? }
+const addSubtask = catchAsync(async (req, res) => {
+  const { project, task } = await loadSubtaskTask(req);
+  const title = String(req.body.title || '').trim();
+  if (!title) throw new ApiError(400, 'Subtask title is required');
+  if (title.length > 300) throw new ApiError(400, 'Subtask title is too long');
+  if (task.subtasks.length >= Task.SUBTASK_MAX) throw new ApiError(400, `A task can have up to ${Task.SUBTASK_MAX} subtasks`);
+  const person = await checkSubtaskAssignee(req.body.assignee, task);
+  const order = task.subtasks.reduce((m, s) => Math.max(m, s.order), -1) + 1;
+  task.subtasks.push({ title, assignee: person ? person._id : null, dueDate: parseDue(req.body.dueDate), order, createdBy: req.user._id });
+  task.activityLog.push({ field: 'subtask', oldValue: null, newValue: `added: ${title}`, changedBy: req.user._id });
+  await finishSubtaskChange(req, res, { task, project, assignedTo: person && person._id, subTitle: title, status: 201 });
+});
+
+// PATCH /api/projects/:projectId/tasks/:id/subtasks/:sid { title?, done?, assignee?, dueDate? }
+const updateSubtask = catchAsync(async (req, res) => {
+  const { project, task } = await loadSubtaskTask(req);
+  const sub = findSubtask(task, req.params.sid);
+  const log = (text) => task.activityLog.push({ field: 'subtask', oldValue: null, newValue: text, changedBy: req.user._id });
+  let assignedTo = null;
+
+  if (req.body.title !== undefined) {
+    const title = String(req.body.title).trim();
+    if (!title) throw new ApiError(400, 'Subtask title is required');
+    if (title.length > 300) throw new ApiError(400, 'Subtask title is too long');
+    if (title !== sub.title) {
+      log(`renamed: ${sub.title} → ${title}`);
+      sub.title = title;
+    }
+  }
+  if (req.body.done !== undefined) {
+    const done = Boolean(req.body.done);
+    if (done !== sub.done) {
+      sub.done = done;
+      sub.completedAt = done ? new Date() : null;
+      sub.completedBy = done ? req.user._id : null;
+      log(`${done ? 'completed' : 'reopened'}: ${sub.title}`);
+    }
+  }
+  if (req.body.assignee !== undefined) {
+    const person = await checkSubtaskAssignee(req.body.assignee || null, task);
+    if (!sameId(person && person._id, sub.assignee)) {
+      sub.assignee = person ? person._id : null;
+      log(person ? `assigned ${person.name}: ${sub.title}` : `unassigned: ${sub.title}`);
+      assignedTo = person && person._id;
+    }
+  }
+  if (req.body.dueDate !== undefined) {
+    const due = parseDue(req.body.dueDate);
+    if (!sameDate(due, sub.dueDate)) {
+      sub.dueDate = due;
+      log(due ? `deadline ${due.toISOString().slice(0, 10)}: ${sub.title}` : `deadline cleared: ${sub.title}`);
+    }
+  }
+  await finishSubtaskChange(req, res, { task, project, assignedTo, subTitle: sub.title });
+});
+
+// DELETE /api/projects/:projectId/tasks/:id/subtasks/:sid
+const deleteSubtask = catchAsync(async (req, res) => {
+  const { project, task } = await loadSubtaskTask(req);
+  const sub = findSubtask(task, req.params.sid);
+  task.activityLog.push({ field: 'subtask', oldValue: null, newValue: `removed: ${sub.title}`, changedBy: req.user._id });
+  sub.deleteOne();
+  await finishSubtaskChange(req, res, { task, project });
+});
+
+// PUT /api/projects/:projectId/tasks/:id/subtasks/order { ids: [sid, ...] }
+const reorderSubtasks = catchAsync(async (req, res) => {
+  const { project, task } = await loadSubtaskTask(req);
+  const ids = Array.isArray(req.body.ids) ? req.body.ids.map(String) : [];
+  const known = new Set(task.subtasks.map((s) => String(s._id)));
+  if (ids.length !== known.size || !ids.every((id) => known.has(id))) throw new ApiError(400, 'Send every subtask id once');
+  ids.forEach((id, i) => {
+    task.subtasks.id(id).order = i;
+  });
+  task.subtasks.sort((a, b) => a.order - b.order);
+  await finishSubtaskChange(req, res, { task, project });
+});
+
 module.exports = {
+  addSubtask,
+  updateSubtask,
+  deleteSubtask,
+  reorderSubtasks,
   listAllTasks,
   createTask,
   listTasks,

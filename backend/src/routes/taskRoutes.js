@@ -10,6 +10,10 @@ const {
   addComment,
   uploadAttachment,
   downloadAttachment,
+  addSubtask,
+  updateSubtask,
+  deleteSubtask,
+  reorderSubtasks,
 } = require('../controllers/taskController');
 
 const router = express.Router({ mergeParams: true });
@@ -27,5 +31,9 @@ router.post('/:id/comments', addComment);
 
 router.post('/:id/attachments', upload.single('file'), uploadAttachment);
 router.get('/:id/attachments/:fileId', downloadAttachment);
+router.post('/:id/subtasks', addSubtask);
+router.put('/:id/subtasks/order', reorderSubtasks);
+router.patch('/:id/subtasks/:sid', updateSubtask);
+router.delete('/:id/subtasks/:sid', deleteSubtask);
 
 module.exports = router;
