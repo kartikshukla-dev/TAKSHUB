@@ -34,6 +34,21 @@ const attachmentSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Checklist items inside a task. Optional assignee / deadline per item.
+const subtaskSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true, trim: true, maxlength: 300 },
+    done: { type: Boolean, default: false },
+    assignee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    dueDate: { type: Date, default: null },
+    order: { type: Number, default: 0 },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    completedAt: { type: Date, default: null },
+    completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  },
+  { timestamps: true }
+);
+
 const taskSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
@@ -56,6 +71,7 @@ const taskSchema = new mongoose.Schema(
     comments: [commentSchema],
     activityLog: [activityLogSchema],
     attachments: [attachmentSchema],
+    subtasks: [subtaskSchema],
     completedAt: { type: Date, default: null },
   },
   { timestamps: true }
@@ -64,6 +80,7 @@ const taskSchema = new mongoose.Schema(
 // Fields we track in the activity log when changed via the "diff & update" helper.
 taskSchema.statics.TRACKED_FIELDS = ['status', 'priority', 'assignee', 'labels', 'dueDate', 'title', 'blocked', 'toTeam'];
 taskSchema.statics.STATUSES = STATUSES;
+taskSchema.statics.SUBTASK_MAX = 100;
 taskSchema.statics.PRIORITIES = PRIORITIES;
 
 module.exports = mongoose.model('Task', taskSchema);

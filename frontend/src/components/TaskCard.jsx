@@ -3,6 +3,7 @@ import { getAgingStage, getAgingDays } from '../utils/taskAge';
 import { taskKey, dueState, formatShortDate } from '../utils/format';
 import { Avatar, PriorityBadge } from './ui';
 import Icon from './Icon';
+import { SubtaskBadge } from './Subtasks';
 
 export default function TaskCard({ task, onOpen, isCompleting = false, onCompletingDone }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -60,6 +61,7 @@ export default function TaskCard({ task, onOpen, isCompleting = false, onComplet
       <div className="task-card-bottom">
         <PriorityBadge priority={task.priority} />
         <span className="task-card-meta">
+          <SubtaskBadge task={task} />
           {task.dueDate && <span className={`due due-${due || 'none'}`}>{formatShortDate(task.dueDate)}</span>}
           {task.assignee ? <Avatar user={task.assignee} size="xs" /> : <span className="avatar avatar-xs avatar-empty">?</span>}
         </span>

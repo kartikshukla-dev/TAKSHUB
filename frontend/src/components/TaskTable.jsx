@@ -3,6 +3,7 @@ import { taskKey, dueState, formatShortDate, timeAgo } from '../utils/format';
 import { useEffects } from '../context/EffectsContext';
 import { Avatar, StatusPill, PriorityBadge } from './ui';
 import TaskPreview from './TaskPreview';
+import { SubtaskBadge } from './Subtasks';
 import Icon from './Icon';
 
 const HOVER_DELAY = 220;
@@ -68,6 +69,11 @@ export default function TaskTable({ tasks, onOpenTask, showProject = true }) {
                   {t.toTeam?.name && (
                     <span className="team-tag" title={t.fromTeam?.name ? `${t.fromTeam.name} → ${t.toTeam.name}` : t.toTeam.name}>
                       → {t.toTeam.name}
+                    </span>
+                  )}
+                  {t.subtasks?.length > 0 && (
+                    <span className="subtask-inline">
+                      <SubtaskBadge task={t} />
                     </span>
                   )}
                   {t.blocked && (
