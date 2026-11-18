@@ -3,7 +3,7 @@ import * as tasksApi from '../api/tasks';
 import { useAuth } from '../context/AuthContext';
 import { useUsers, useProjects, useDepartments } from '../hooks/useDirectory';
 import { emitTaskChange } from '../utils/taskEvents';
-import { STATUSES, PRIORITIES, idOf, projectIdOf } from '../utils/format';
+import { CREATE_STATUSES, PRIORITIES, idOf, projectIdOf } from '../utils/format';
 import { Modal } from './ui';
 import Icon from './Icon';
 
@@ -238,7 +238,7 @@ export default function CreateTaskModal({ defaults = {}, onClose, onCreated }) {
             <div className="field">
               <label htmlFor="task-status">Status</label>
               <select id="task-status" className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
-                {STATUSES.map((s) => (
+                {CREATE_STATUSES.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.label}
                   </option>

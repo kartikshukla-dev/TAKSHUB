@@ -225,7 +225,7 @@ const reports = catchAsync(async (req, res) => {
   const durations = completedInRange.map((t) => new Date(t.completedAt) - new Date(t.createdAt)).filter((ms) => ms >= 0);
   const avgCompleteMs = durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : null;
 
-  const byStatus = { todo: 0, 'in-progress': 0, 'in-review': 0 };
+  const byStatus = { todo: 0, 'in-progress': 0, 'in-review': 0, 'not-approved': 0 };
   const byPriority = { urgent: 0, high: 0, medium: 0, low: 0 };
   open.forEach((t) => {
     if (t.status in byStatus) byStatus[t.status] += 1;

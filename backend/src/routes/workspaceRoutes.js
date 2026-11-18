@@ -20,6 +20,13 @@ const chatUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 5, fieldSize: 1024 * 1024 },
 });
+const stickers = require('../controllers/stickerController');
+
+// Custom stickers: one image, 1 MB.
+const stickerUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: stickers.STICKER_MAX_BYTES, files: 1 },
+});
 const { listNotifications, markRead, markAllRead } = require('../controllers/notificationController');
 const { search } = require('../controllers/searchController');
 const emailAdmin = require('../controllers/emailController');
@@ -86,6 +93,16 @@ router.post('/chat/messages/:mid/reactions', chat.reactToMessage);
 router.post('/chat/messages/:mid/pin', chat.pinMessage);
 router.post('/chat/messages/:mid/save', chat.saveMessage);
 router.get('/chat/messages/:mid/files/:fileId', chat.downloadFile);
+
+// Stickers and GIFs.
+router.get('/chat/stickers', stickers.listStickers);
+router.post('/chat/stickers', stickerUpload.single('image'), stickers.uploadSticker);
+router.post('/chat/stickers/saved', stickers.toggleSaved);
+router.delete('/chat/stickers/recent', stickers.clearRecent);
+router.get('/chat/stickers/:id/image', stickers.stickerImage);
+router.patch('/chat/stickers/:id', stickers.updateSticker);
+router.delete('/chat/stickers/:id', stickers.deleteSticker);
+router.get('/chat/giphy/:kind', stickers.giphySearch);
 
 router.get('/notifications', listNotifications);
 router.post('/notifications/read-all', markAllRead);

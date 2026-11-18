@@ -16,7 +16,8 @@ function errorHandler(err, req, res, next) { // eslint-disable-line no-unused-va
       LIMIT_FILE_COUNT: 'You can attach up to 5 files at once',
       LIMIT_FIELD_VALUE: 'Message is too long',
     };
-    return res.status(400).json({ message: messages[err.code] || 'Upload failed' });
+    const sticker = err.code === 'LIMIT_FILE_SIZE' && /\/chat\/stickers/.test(req.originalUrl || '');
+    return res.status(400).json({ message: sticker ? 'Sticker image must be 1 MB or smaller' : messages[err.code] || 'Upload failed' });
   }
   if (err.type === 'entity.too.large') {
     return res.status(413).json({ message: 'Message is too large' });

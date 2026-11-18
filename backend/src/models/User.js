@@ -11,6 +11,18 @@ const ROLES = ['admin', 'manager', 'member'];
 // disabled = cannot sign in
 const STATUSES = ['invited', 'active', 'disabled'];
 
+const stickerRefSchema = new mongoose.Schema(
+  {
+    source: { type: String, enum: ['giphy', 'office', 'custom'], required: true },
+    ref: { type: String, required: true },
+    url: { type: String, required: true },
+    title: { type: String, default: '' },
+    width: { type: Number, default: null },
+    height: { type: Number, default: null },
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -28,6 +40,9 @@ const userSchema = new mongoose.Schema(
     jobTitle: { type: String, default: '', trim: true },
     department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', default: null, index: true },
     emailNotifications: { type: Boolean, default: true },
+    // Chat stickers: "Saved" (like WhatsApp favourites) and "Recent" (last sent).
+    savedStickers: { type: [stickerRefSchema], default: [] },
+    recentStickers: { type: [stickerRefSchema], default: [] },
     invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     invitedAt: { type: Date, default: null },
     lastLoginAt: { type: Date, default: null },

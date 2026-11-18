@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../Icon';
 import { Avatar, Modal } from '../ui';
 import { idOf } from '../../utils/format';
-import { EmojiPicker } from './MessageParts';
+import MediaPicker from './MediaPicker';
 import { fileSize } from './format';
 
 export const TEXT_MAX = 4000;
@@ -237,6 +237,15 @@ export default function Composer({ placeholder, members = [], meId, allowChannel
     return false;
   };
 
+  // GIFs and stickers go out on their own, straight from the picker.
+  const sendMedia = async (media) => {
+    setEmoji(false);
+    setBusy(true);
+    const ok = await onSend({ text: '', mentions: [], files: [], snippet: null, media });
+    setBusy(false);
+    if (!ok) setError('Could not send. Try again.');
+  };
+
   const keyDown = (e) => {
     if (query && options.length) {
       if (e.key === 'ArrowDown') {
@@ -346,16 +355,17 @@ export default function Composer({ placeholder, members = [], meId, allowChannel
         </button>
         <span className="composer-sep" />
         <div className="popover-anchor">
-          <button type="button" className="icon-btn icon-btn-sm" onClick={() => setEmoji((v) => !v)} aria-label="Emoji" title="Emoji">
+          <button type="button" className="icon-btn icon-btn-sm" onClick={() => setEmoji((v) => !v)} aria-label="Emoji, GIFs and stickers" title="Emoji, GIFs and stickers">
             <Icon name="smile" size={15} />
           </button>
           {emoji && (
-            <EmojiPicker
+            <MediaPicker
               onClose={() => setEmoji(false)}
-              onPick={(e) => {
+              onEmoji={(e) => {
                 setEmoji(false);
                 insertAtCaret(e);
               }}
+              onMedia={sendMedia}
             />
           )}
         </div>

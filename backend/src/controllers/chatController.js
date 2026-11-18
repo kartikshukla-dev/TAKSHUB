@@ -7,6 +7,7 @@ const catchAsync = require('../utils/catchAsync');
 const gridfs = require('../services/gridfsService');
 const { emitToUsers, getPresence } = require('../services/socketService');
 const { notify } = require('../services/notificationService');
+const { resolveMedia, pushRecent } = require('./stickerController');
 
 const MEMBER_FIELDS = 'name email avatar jobTitle';
 const NAMED = ['group', 'channel'];
@@ -95,6 +96,7 @@ function parseMaybeJson(value, fallback) {
 function previewOf(message) {
   if (message.text) return message.text.slice(0, 200);
   if (message.snippet) return `Snippet: ${message.snippet.title || message.snippet.language || 'code'}`;
+  if (message.media) return message.media.type === 'gif' ? 'GIF' : 'Sticker';
   if (message.files && message.files.length) return `📎 ${message.files[0].filename}`;
   return '';
 }
@@ -309,6 +311,7 @@ const sendMessage = catchAsync(async (req, res) => {
   const snippetIn = parseMaybeJson(req.body.snippet, null);
   const mentionIds = parseMaybeJson(req.body.mentions, []);
   const uploads = req.files || [];
+  const mediaIn = parseMaybeJson(req.body.media, null);
 
   if (text.length > Message.TEXT_MAX) {
     throw new ApiError(400, `Message is longer than ${Message.TEXT_MAX} characters. Send it as a snippet instead.`);
@@ -323,7 +326,8 @@ const sendMessage = catchAsync(async (req, res) => {
       code,
     };
   }
-  if (!text && !snippet && uploads.length === 0) throw new ApiError(400, 'Message cannot be empty');
+  const media = mediaIn ? await resolveMedia(req.user, mediaIn) : null;
+  if (!text && !snippet && !media && uploads.length === 0) throw new ApiError(400, 'Message cannot be empty');
 
   let parent = null;
   if (req.body.parent) {
@@ -351,12 +355,14 @@ const sendMessage = catchAsync(async (req, res) => {
     sender: req.user._id,
     text,
     snippet,
+    media,
     files,
     parent: parent ? parent._id : null,
     mentions,
     mentionAll,
   });
   await message.populate('sender', MEMBER_FIELDS);
+  if (media) await pushRecent(req.user, media).catch(() => {});
 
   if (parent) {
     parent.replyCount += 1;
@@ -400,7 +406,7 @@ const editMessage = catchAsync(async (req, res) => {
   if (message.deletedAt) throw new ApiError(400, 'This message was deleted');
   const text = String(req.body.text || '').trim();
   if (text.length > Message.TEXT_MAX) throw new ApiError(400, `Message is longer than ${Message.TEXT_MAX} characters`);
-  if (!text && !message.snippet && message.files.length === 0) throw new ApiError(400, 'Message cannot be empty');
+  if (!text && !message.snippet && !message.media && message.files.length === 0) throw new ApiError(400, 'Message cannot be empty');
   if (text !== message.text) {
     message.text = text;
     message.editedAt = new Date();
@@ -420,6 +426,7 @@ const deleteMessage = catchAsync(async (req, res) => {
     await Promise.all(message.files.map((f) => gridfs.deleteFile(f.fileId).catch(() => {})));
     message.text = '';
     message.snippet = null;
+    message.media = null;
     message.files = [];
     message.reactions = [];
     message.mentions = [];
@@ -438,7 +445,7 @@ const reactToMessage = catchAsync(async (req, res) => {
   const { message, conversation } = await loadMessage(req);
   if (message.deletedAt) throw new ApiError(400, 'This message was deleted');
   const emoji = String(req.body.emoji || '').trim();
-  if (!emoji || emoji.length > 16) throw new ApiError(400, 'Pick an emoji');
+  if (!emoji || emoji.length > 32) throw new ApiError(400, 'Pick an emoji');
   const me = String(req.user._id);
   let reaction = message.reactions.find((r) => r.emoji === emoji);
   if (!reaction) {
@@ -516,7 +523,7 @@ const searchMessages = catchAsync(async (req, res) => {
   const messages = await Message.find({
     conversation: { $in: mine },
     deletedAt: null,
-    $or: [{ text: rx }, { 'snippet.code': rx }, { 'snippet.title': rx }, { 'files.filename': rx }],
+    $or: [{ text: rx }, { 'snippet.code': rx }, { 'snippet.title': rx }, { 'files.filename': rx }, { 'media.title': rx }],
   })
     .sort({ createdAt: -1 })
     .limit(40)

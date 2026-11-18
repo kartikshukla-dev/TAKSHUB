@@ -30,7 +30,8 @@ export const listMessages = (id, params = {}) =>
   apiClient.get(`/chat/conversations/${id}/messages`, { params }).then((r) => r.data);
 export const getThread = (messageId) => apiClient.get(`/chat/messages/${messageId}/thread`).then((r) => r.data);
 // { text, parent?, snippet?, mentions?, files? }. Files switch to multipart.
-export const sendMessage = (id, { text = '', parent, snippet, mentions = [], files = [] } = {}) => {
+export const sendMessage = (id, { text = '', parent, snippet, mentions = [], files = [], media = null } = {}) => {
+  if (media) return apiClient.post(`/chat/conversations/${id}/messages`, { text, parent, media }).then((r) => r.data.message);
   if (files.length) {
     const form = new FormData();
     form.append('text', text);
@@ -55,6 +56,24 @@ export const searchChat = (q) => apiClient.get('/chat/search', { params: { q } }
 export const getPresence = () => apiClient.get('/chat/presence').then((r) => r.data.presence);
 export const fetchChatFile = (mid, fileId, inline = false) =>
   apiClient.get(`/chat/messages/${mid}/files/${fileId}`, { params: inline ? { inline: 1 } : {}, responseType: 'blob' }).then((r) => r.data);
+// Stickers and GIFs.
+export const listStickers = () => apiClient.get('/chat/stickers').then((r) => r.data);
+export const uploadSticker = ({ file, name, global }) => {
+  const form = new FormData();
+  form.append('image', file);
+  form.append('name', name);
+  form.append('global', String(Boolean(global)));
+  return apiClient.post('/chat/stickers', form, { headers: { 'Content-Type': 'multipart/form-data' } }).then((r) => r.data.sticker);
+};
+export const updateSticker = (id, payload) => apiClient.patch(`/chat/stickers/${id}`, payload).then((r) => r.data.sticker);
+export const deleteSticker = (id) => apiClient.delete(`/chat/stickers/${id}`);
+export const toggleSavedSticker = (sticker, on) =>
+  apiClient.post('/chat/stickers/saved', { ...sticker, on }).then((r) => r.data);
+export const clearRecentStickers = () => apiClient.delete('/chat/stickers/recent');
+// path is relative to the API, e.g. /chat/stickers/<id>/image
+export const fetchApiBlob = (path) => apiClient.get(path, { responseType: 'blob' }).then((r) => r.data);
+export const searchGiphy = (kind, q, offset = 0) =>
+  apiClient.get(`/chat/giphy/${kind}`, { params: { q, offset } }).then((r) => r.data);
 export const markConversationRead = (id) => apiClient.post(`/chat/conversations/${id}/read`);
 
 export const listNotifications = () => apiClient.get('/notifications').then((r) => r.data);
