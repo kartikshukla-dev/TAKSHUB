@@ -6,6 +6,7 @@ import { emitTaskChange } from '../utils/taskEvents';
 import { STATUSES, PRIORITIES, taskKey, projectIdOf, idOf, describeActivity, formatDateTime, timeAgo } from '../utils/format';
 import { Avatar, Modal, Toggle } from './ui';
 import Icon from './Icon';
+import Subtasks from './Subtasks';
 
 export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
   const { userId, isAdmin, canManageTeam, canPlanTeamTask } = useAuth();
@@ -183,6 +184,8 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
             onChange={(e) => setDescription(e.target.value)}
             onBlur={saveDescription}
           />
+
+          <Subtasks task={task} projectId={projectId} people={pickable} onTask={apply} onError={setError} />
 
           <section className="task-section">
             <div className="task-section-head">

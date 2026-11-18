@@ -30,6 +30,14 @@ export default function CreateTaskModal({ defaults = {}, onClose, onCreated }) {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [files, setFiles] = useState([]);
+  const [subtasks, setSubtasks] = useState([]);
+  const [subDraft, setSubDraft] = useState('');
+  const addSub = () => {
+    const t = subDraft.trim();
+    if (!t) return;
+    setSubtasks((prev) => [...prev, t]);
+    setSubDraft('');
+  };
   const [progress, setProgress] = useState('');
   // Set when the task was created but some files failed: no second submit.
   const [createdTask, setCreatedTask] = useState(null);
@@ -81,6 +89,9 @@ export default function CreateTaskModal({ defaults = {}, onClose, onCreated }) {
           .filter(Boolean),
       };
       if (toTeam) payload.toTeam = toTeam;
+      // A typed but not yet added subtask is kept too.
+      const subs = [...subtasks, subDraft.trim()].filter(Boolean);
+      if (subs.length) payload.subtasks = subs;
       if (!toTeam) payload.status = status;
       if (canPlan) {
         payload.assignee = assignee || null;
@@ -250,6 +261,42 @@ export default function CreateTaskModal({ defaults = {}, onClose, onCreated }) {
             <input id="task-labels" className="input" value={labelsInput} placeholder="comma separated" onChange={(e) => setLabelsInput(e.target.value)} />
           </div>
         </div>
+        <div className="field">
+          <label htmlFor="task-subtask">Subtasks</label>
+          {subtasks.length > 0 && (
+            <ul className="attach-list">
+              {subtasks.map((s, i) => (
+                <li key={`${s}${i}`}>
+                  <Icon name="listChecks" size={14} />
+                  <span className="attach-name">{s}</span>
+                  <button
+                    type="button"
+                    className="icon-btn icon-btn-sm"
+                    onClick={() => setSubtasks((prev) => prev.filter((_, x) => x !== i))}
+                    aria-label={`Remove subtask ${s}`}
+                  >
+                    <Icon name="x" size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <input
+            id="task-subtask"
+            className="input"
+            value={subDraft}
+            maxLength={300}
+            placeholder="Optional. Type a step and press Enter"
+            onChange={(e) => setSubDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addSub();
+              }
+            }}
+          />
+        </div>
+
         <div className="field">
           <div className="section-head">
             <label htmlFor="task-files">Attachments</label>
