@@ -3,13 +3,13 @@ import * as tasksApi from '../api/tasks';
 import { useAuth } from '../context/AuthContext';
 import { useUsers, useDepartments } from '../hooks/useDirectory';
 import { emitTaskChange } from '../utils/taskEvents';
-import { STATUSES, PRIORITIES, taskKey, projectIdOf, idOf, describeActivity, formatDateTime, timeAgo } from '../utils/format';
+import { STATUSES, NOT_APPROVED, PRIORITIES, taskKey, projectIdOf, idOf, describeActivity, formatDateTime, timeAgo } from '../utils/format';
 import { Avatar, Modal, Toggle } from './ui';
 import Icon from './Icon';
 import Subtasks from './Subtasks';
 
 export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
-  const { userId, isAdmin, canManageTeam, canPlanTeamTask } = useAuth();
+  const { userId, isAdmin, canManageTeam, canPlanTeamTask, canApproveTask } = useAuth();
   const { users } = useUsers();
   const { departments } = useDepartments();
   const [task, setTask] = useState(initialTask);
@@ -148,6 +148,8 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
   // On a team task only that team's head (or a Super Admin) plans it.
   const canPlan = !toTeamId || canPlanTeamTask(toTeamId, fromTeamId);
   const canRoute = isAdmin || isReporter || canManageTeam(toTeamId);
+  const canApprove = Boolean(canApproveTask?.(task));
+  const notApproved = task.status === NOT_APPROVED;
   const canDelete = isAdmin || isReporter || canManageTeam(toTeamId) || canManageTeam(fromTeamId);
   const pickable = toTeamId ? users.filter((u) => idOf(u.department) === toTeamId) : users;
   const lockedHint = task.toTeam?.name ? `Set by the ${task.toTeam.name} head` : '';
@@ -287,13 +289,25 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
           )}
           <div className="side-field">
             <span className="field-label">Status</span>
-            <select className="input" value={task.status} onChange={(e) => patch({ status: e.target.value })}>
-              {STATUSES.map((s) => (
+            <select
+              className="input"
+              value={task.status}
+              onChange={(e) => patch({ status: e.target.value })}
+              disabled={notApproved && !canApprove}
+              title={notApproved && !canApprove ? 'Only the team head can change this' : undefined}
+              aria-label="Status"
+            >
+              {STATUSES.filter((s) => s.id !== NOT_APPROVED || canApprove || notApproved).map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.label}
                 </option>
               ))}
             </select>
+            {notApproved && (
+              <span className="muted small not-approved-hint">
+                {canApprove ? 'Marked Not approved. Pick another status to approve it.' : 'Not approved by the team head. Only they can change the status.'}
+              </span>
+            )}
           </div>
           <div className="side-field">
             <span className="field-label">Priority</span>

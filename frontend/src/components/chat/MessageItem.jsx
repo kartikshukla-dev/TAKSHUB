@@ -3,7 +3,8 @@ import Icon from '../Icon';
 import { Avatar } from '../ui';
 import { formatDateTime, timeAgo, idOf } from '../../utils/format';
 import { QUICK_REACTIONS, RichText, firstLink, timeLabel } from './format';
-import { EmojiPicker, FileList, SnippetView } from './MessageParts';
+import { FileList, SnippetView } from './MessageParts';
+import MediaPicker, { MessageMedia, isSavedSticker, toggleSavedSticker, loadStickers } from './MediaPicker';
 
 /**
  * One chat message with Slack-style hover actions.
@@ -19,6 +20,29 @@ export default function MessageItem({ message: m, meId, grouped, usersById, ctx,
   const [menu, setMenu] = useState(false);
   const deleted = Boolean(m.deletedAt);
   const link = !deleted && firstLink(m.text);
+  const sticker = !deleted && m.media?.type === 'sticker' ? m.media : null;
+  const [stickerSaved, setStickerSaved] = useState(false);
+  const [stickerNote, setStickerNote] = useState('');
+
+  const openMenu = async () => {
+    setMenu((v) => !v);
+    if (sticker) {
+      // Make sure the Saved list is known before showing Save / Remove.
+      if (!isSavedSticker(sticker)) await loadStickers().catch(() => {});
+      setStickerSaved(isSavedSticker(sticker));
+    }
+  };
+  const toggleSticker = async () => {
+    setMenu(false);
+    try {
+      const on = await toggleSavedSticker(sticker);
+      setStickerSaved(on);
+      setStickerNote(on ? 'Sticker saved' : 'Removed from saved stickers');
+    } catch (err) {
+      setStickerNote(err.response?.data?.message || 'Could not save the sticker');
+    }
+    setTimeout(() => setStickerNote(''), 2500);
+  };
 
   const saveEdit = async () => {
     const next = draft.trim();
@@ -95,6 +119,8 @@ export default function MessageItem({ message: m, meId, grouped, usersById, ctx,
             {m.text && <RichText text={m.text} ctx={ctx} />}
             {m.editedAt && <span className="cmsg-edited">(edited)</span>}
             {m.snippet && <SnippetView snippet={m.snippet} />}
+            {m.media && <MessageMedia media={m.media} />}
+            {stickerNote && <div className="cmsg-flag">{stickerNote}</div>}
             {m.files?.length > 0 && <FileList message={m} />}
             {link && (
               <a className="link-card" href={link.href} target="_blank" rel="noopener noreferrer">
@@ -142,10 +168,10 @@ export default function MessageItem({ message: m, meId, grouped, usersById, ctx,
               <Icon name="smile" size={15} />
             </button>
             {picker && (
-              <EmojiPicker
+              <MediaPicker
                 align="right"
                 onClose={() => setPicker(false)}
-                onPick={(e) => {
+                onEmoji={(e) => {
                   setPicker(false);
                   actions.react(m, e);
                 }}
@@ -167,11 +193,16 @@ export default function MessageItem({ message: m, meId, grouped, usersById, ctx,
             <Icon name="bookmark" size={15} />
           </button>
           <div className="popover-anchor">
-            <button type="button" className="icon-btn icon-btn-sm" onClick={() => setMenu((v) => !v)} aria-label="More actions" title="More">
+            <button type="button" className="icon-btn icon-btn-sm" onClick={openMenu} aria-label="More actions" title="More">
               <Icon name="more" size={15} />
             </button>
             {menu && (
               <div className="popover cmsg-menu">
+                {sticker && (
+                  <button type="button" className="menu-item" onClick={toggleSticker}>
+                    <Icon name="star" size={14} /> {stickerSaved ? 'Remove from saved stickers' : 'Save sticker'}
+                  </button>
+                )}
                 <button type="button" className="menu-item" onClick={() => { setMenu(false); actions.pin(m); }}>
                   <Icon name="pin" size={14} /> {m.pinnedAt ? 'Unpin' : 'Pin to conversation'}
                 </button>

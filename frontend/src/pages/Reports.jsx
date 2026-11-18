@@ -81,7 +81,7 @@ export default function Reports() {
             <Card title="Open tasks by status">
               <Breakdown
                 dotClass="status-dot"
-                rows={['todo', 'in-progress', 'in-review'].map((id) => ({ id, label: STATUS_LABEL[id], value: data.byStatus[id] }))}
+                rows={['todo', 'in-progress', 'in-review', 'not-approved'].map((id) => ({ id, label: STATUS_LABEL[id], value: data.byStatus[id] }))}
               />
             </Card>
             <Card title="Open tasks by priority">

@@ -1033,6 +1033,29 @@ a.cell-person:hover {
 .status-dot-todo {
   background: var(--status-todo);
 }
+.status-not-approved .status-dot,
+.status-dot-not-approved {
+  background: var(--status-not-approved);
+}
+.status-not-approved {
+  background: color-mix(in srgb, var(--status-not-approved) 13%, transparent);
+}
+.sound-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.sound-pick .input {
+  width: auto;
+  min-width: 140px;
+}
+.not-approved-hint {
+  display: block;
+  margin-top: 4px;
+  color: var(--status-not-approved);
+}
 
 .status-in-progress {
   background: color-mix(in srgb, var(--status-in-progress) 12%, transparent);
@@ -1956,7 +1979,7 @@ a.bar-row:hover .cell-person {
 
 .board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(240px, 1fr));
+  grid-template-columns: repeat(5, minmax(220px, 1fr));
   gap: 12px;
   overflow-x: auto;
   padding-bottom: 8px;
@@ -4225,6 +4248,10 @@ body {
   --col: var(--status-done);
 }
 
+.board-column:has(.status-dot-not-approved) {
+  --col: var(--status-not-approved);
+}
+
 .task-card {
   border-radius: 4px;
 }
@@ -5205,6 +5232,342 @@ body {
 
 .emoji-btn:hover {
   background: var(--muted);
+}
+
+/* emoji / GIF / sticker picker */
+.media-picker {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: min(352px, 92vw);
+  height: min(420px, 70vh);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--popover);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.media-picker-left {
+  left: 0;
+}
+
+.media-picker-right {
+  right: 0;
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+
+.media-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.media-tab {
+  flex: 1;
+  padding: 7px 6px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.media-tab-on {
+  border-bottom-color: var(--primary);
+  color: var(--foreground);
+}
+
+.media-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--muted-foreground);
+}
+
+.media-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+}
+
+.media-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.media-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 0 8px 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.media-body > .emoji-grid {
+  padding: 0 8px 8px;
+  overflow-y: auto;
+}
+
+.media-heading {
+  margin: 8px 2px 4px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.media-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.media-heading-row .link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+}
+
+.media-empty,
+.media-hint {
+  margin: 6px 4px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.media-empty {
+  padding: 16px 8px;
+  text-align: center;
+}
+
+.media-more {
+  display: block;
+  margin: 8px auto 0;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(34px, 1fr));
+}
+
+.emoji-grid .emoji-btn {
+  width: 100%;
+  height: 34px;
+  font-size: 20px;
+}
+
+.emoji-groups {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 8px 4px;
+}
+
+.emoji-group-btn {
+  padding: 3px 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.emoji-group-btn:hover {
+  background: var(--muted);
+}
+
+.sticker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.gif-grid {
+  columns: 2;
+  column-gap: 4px;
+}
+
+.sticker-cell {
+  position: relative;
+}
+
+.sticker-btn,
+.gif-btn {
+  display: block;
+  width: 100%;
+  padding: 2px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+}
+
+.sticker-btn {
+  aspect-ratio: 1;
+}
+
+.gif-btn {
+  margin-bottom: 4px;
+  break-inside: avoid;
+}
+
+.sticker-btn:hover,
+.gif-btn:hover {
+  background: var(--muted);
+}
+
+.sticker-btn .sticker-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.gif-btn .sticker-img {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-sm);
+}
+
+.sticker-loading {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 60px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.sticker-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  text-align: center;
+}
+
+.sticker-tools {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: none;
+  gap: 2px;
+}
+
+.sticker-cell:hover .sticker-tools,
+.sticker-cell:focus-within .sticker-tools {
+  display: flex;
+}
+
+.sticker-tools .icon-btn {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--popover);
+  box-shadow: var(--shadow-sm);
+}
+
+.sticker-tools .icon-btn.is-on {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.giphy-credit {
+  margin: 8px 0 0;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  text-align: right;
+}
+
+.sticker-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 10px 10px;
+  overflow-y: auto;
+}
+
+.sticker-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 130px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  text-align: center;
+  cursor: pointer;
+}
+
+.sticker-drop img {
+  max-width: 120px;
+  max-height: 120px;
+  object-fit: contain;
+}
+
+.media-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.sticker-upload-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* GIFs and stickers inside messages */
+.msg-media {
+  margin-top: 4px;
+}
+
+.msg-sticker .sticker-img {
+  display: block;
+  width: 132px;
+  height: 132px;
+  object-fit: contain;
+}
+
+.msg-gif {
+  max-width: min(280px, 100%);
+}
+
+.msg-gif .sticker-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius);
+  object-fit: cover;
+}
+
+.msg-gif .sticker-loading {
+  min-height: 140px;
 }
 
 /* side panel */

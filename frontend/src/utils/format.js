@@ -3,7 +3,12 @@ export const STATUSES = [
   { id: 'in-progress', label: 'In progress' },
   { id: 'in-review', label: 'In review' },
   { id: 'done', label: 'Done' },
+  // Set and cleared only by the team head (or a Super Admin).
+  { id: 'not-approved', label: 'Not approved' },
 ];
+export const NOT_APPROVED = 'not-approved';
+// A new task can't start as Not approved.
+export const CREATE_STATUSES = STATUSES.filter((s) => s.id !== NOT_APPROVED);
 export const STATUS_LABEL = Object.fromEntries(STATUSES.map((s) => [s.id, s.label]));
 
 export const PRIORITIES = [

@@ -7,6 +7,15 @@ import { useEffects } from '../context/EffectsContext';
 import { Card, PageHeader, Toggle } from '../components/ui';
 import { ThemePicker } from '../components/ThemeToggle';
 import { ROLE_LABEL, WORKSPACE_NAME } from '../utils/format';
+import {
+  MEME_SOUNDS,
+  MEME_SOUND_KEY,
+  SOUND_STYLE_KEY,
+  getMemeSound,
+  getSoundStyle,
+  playDefaultPing,
+  playMemeSound,
+} from '../utils/messageSounds';
 
 function ProfileCard() {
   const { user, updateCurrentUser } = useAuth();
@@ -122,6 +131,59 @@ function PushCard() {
         <Toggle checked={pushEnabled} onChange={change} label="Notifications on this device" disabled={!supported} />
       </div>
       {!supported && <p className="muted small">This browser doesn&apos;t support notifications.</p>}
+    </Card>
+  );
+}
+
+function SoundCard() {
+  const { soundEnabled, setSoundEnabled } = useLive();
+  const [style, setStyle] = useState(getSoundStyle);
+  const [meme, setMeme] = useState(getMemeSound);
+
+  const save = (key, value, set) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* storage blocked */
+    }
+    set(value);
+  };
+  const preview = () => (style === 'meme' ? playMemeSound(meme) : playDefaultPing());
+
+  return (
+    <Card title="Message sound" subtitle="What plays when a new chat message arrives. Saved for this browser.">
+      <div className="setting-row">
+        <div>
+          <strong>Play a sound</strong>
+          <span className="muted small">Muted chats stay quiet unless someone @mentions you.</span>
+        </div>
+        <Toggle checked={soundEnabled} onChange={setSoundEnabled} label="Play a sound for new messages" />
+      </div>
+      <div className="setting-row">
+        <div>
+          <strong>Sound</strong>
+          <span className="muted small">Default is the usual short ping. Meme sounds are fun effects like an air horn or sad trombone.</span>
+        </div>
+        <div className="sound-pick">
+          <select className="input" value={style} onChange={(e) => save(SOUND_STYLE_KEY, e.target.value, setStyle)} aria-label="Sound style" disabled={!soundEnabled}>
+            <option value="default">Default</option>
+            <option value="meme">Meme sounds</option>
+          </select>
+          {style === 'meme' && (
+            <select className="input" value={meme} onChange={(e) => save(MEME_SOUND_KEY, e.target.value, setMeme)} aria-label="Meme sound" disabled={!soundEnabled}>
+              <option value="random">🎲 Random each time</option>
+              {MEME_SOUNDS.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.emoji} {s.label}
+                </option>
+              ))}
+            </select>
+          )}
+          <button type="button" className="btn btn-secondary btn-sm" onClick={preview}>
+            Play
+          </button>
+        </div>
+      </div>
     </Card>
   );
 }
@@ -248,6 +310,7 @@ export default function Settings() {
       <PageHeader title="Settings" subtitle="Your profile, password and notification preferences." />
       <ProfileCard />
       <PushCard />
+      <SoundCard />
       <EffectsCard />
       {isAdmin && <EmailDeliveryCard />}
       <AccessCard />

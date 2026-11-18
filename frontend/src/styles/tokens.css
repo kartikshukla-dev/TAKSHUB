@@ -46,6 +46,7 @@
   --status-in-progress: #2f7ff0;
   --status-in-review: #a24bd8;
   --status-done: #12a05c;
+  --status-not-approved: #d92d20;
 
   --priority-low: #8a8a96;
   --priority-medium: #2f7ff0;
@@ -134,6 +135,7 @@
   --status-in-progress: #5aa2ff;
   --status-in-review: #c77dff;
   --status-done: #3ccf86;
+  --status-not-approved: #ff6b5e;
 
   --priority-low: #8d8d9a;
   --priority-medium: #5aa2ff;

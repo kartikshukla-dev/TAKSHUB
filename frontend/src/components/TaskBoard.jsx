@@ -3,7 +3,8 @@ import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import * as tasksApi from '../api/tasks';
 import { shouldPlayDropAnimation } from '../utils/dropAnimation';
 import { onTaskChange, emitTaskChange } from '../utils/taskEvents';
-import { STATUSES, projectIdOf } from '../utils/format';
+import { STATUSES, NOT_APPROVED, projectIdOf } from '../utils/format';
+import { useAuth } from '../context/AuthContext';
 import Column from './Column';
 
 // Kanban view over an already-filtered task list. Owns the optimistic
@@ -11,6 +12,7 @@ import Column from './Column';
 // parent so the list and board views share one source of truth.
 export default function TaskBoard({ tasks, setTasks, onOpenTask, onError }) {
   const [justCompleted, setJustCompleted] = useState(null);
+  const { canApproveTask } = useAuth();
   // A small drag threshold keeps plain clicks opening the task.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -39,6 +41,14 @@ export default function TaskBoard({ tasks, setTasks, onOpenTask, onError }) {
     const newStatus = over.id;
     const task = tasks.find((t) => t._id === taskId);
     if (!task || task.status === newStatus) return;
+    if ((newStatus === NOT_APPROVED || task.status === NOT_APPROVED) && !canApproveTask(task)) {
+      onError?.(
+        task.status === NOT_APPROVED
+          ? 'This task is Not approved. Only the team head can move it.'
+          : 'Only the team head can mark a task as Not approved'
+      );
+      return;
+    }
 
     if (shouldPlayDropAnimation(task.status, newStatus)) setJustCompleted(taskId);
 

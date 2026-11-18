@@ -28,6 +28,7 @@ const STATUS = {
   'in-progress': { label: 'In progress', color: '#1d6fb8', bg: '#e3f0fb' },
   'in-review': { label: 'In review', color: '#8a3fd1', bg: '#f4e9fe' },
   done: { label: 'Done', color: '#15803d', bg: '#e8f6ee' },
+  'not-approved': { label: 'Not approved', color: '#b42318', bg: '#fdecea' },
 };
 
 const PRIORITY = {

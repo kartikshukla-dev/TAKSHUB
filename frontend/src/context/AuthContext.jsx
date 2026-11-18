@@ -88,6 +88,15 @@ export function AuthProvider({ children }) {
   const canPlanTeamTask = (toTeam, fromTeam) =>
     canManageTeam(toTeam) ||
     (Boolean(departmentId) && String(toTeam || '') === departmentId && String(fromTeam || '') === departmentId);
+  // Mirrors backend canApproveTask: who may set / lift "Not approved".
+  // Head of the task's team; for tasks without a team, head of the assignee's team.
+  const canApproveTask = (task) => {
+    if (!task) return false;
+    if (isAdmin) return true;
+    const ref = (v) => (v ? String(v._id || v) : null);
+    const team = ref(task.toTeam) || ref(task.assignee?.department);
+    return canManageTeam(team);
+  };
 
   return (
     <AuthContext.Provider
@@ -107,6 +116,7 @@ export function AuthProvider({ children }) {
         departmentId,
         canManageTeam,
         canPlanTeamTask,
+        canApproveTask,
       }}
     >
       {children}

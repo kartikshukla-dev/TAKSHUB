@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { useSocket, useSocketEvent } from './SocketContext';
 import * as ws from '../api/workspace';
+import { playMessageSound } from '../utils/messageSounds';
 
 // Live, app-wide state fed by the socket: notifications, chat unread count,
 // the message sound and browser pop-up notifications.
@@ -11,27 +12,6 @@ const LiveContext = createContext(null);
 const PUSH_KEY = 'oncare_push';
 const SOUND_KEY = 'oncare_msg_sound';
 
-function playPing() {
-  try {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.15);
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.26);
-    osc.onended = () => ctx.close();
-  } catch {
-    // Audio is a nicety; ignore failures (e.g. autoplay policy).
-  }
-}
 
 export function LiveProvider({ children }) {
   const { user, userId } = useAuth();
@@ -101,10 +81,12 @@ export function LiveProvider({ children }) {
     const viewing = location.pathname.startsWith('/chat') && activeConversationRef.current === String(conversationId);
     if (!viewing && !muted && !message.parent) setChatUnread((c) => c + 1);
     if (muted) return;
-    if (soundEnabled) playPing();
+    // Default ping, or the meme sound picked in Settings.
+    if (soundEnabled) playMessageSound();
     const where = conversationName ? `${conversationType === 'channel' ? '#' : ''}${conversationName}` : '';
     const title = where ? `${message.sender?.name} in ${where}` : message.sender?.name;
-    popUp(title || 'New message', message.text || (message.snippet ? 'Shared a snippet' : 'Shared a file'), `/chat?c=${conversationId}`);
+    popUp(title || 'New message', message.text ||
+        (message.snippet ? 'Shared a snippet' : message.media ? (message.media.type === 'gif' ? 'Sent a GIF' : 'Sent a sticker') : 'Shared a file'), `/chat?c=${conversationId}`);
   });
 
   // Who's online: initial snapshot + live changes. Hidden tab = "away".

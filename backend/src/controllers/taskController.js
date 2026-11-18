@@ -15,7 +15,19 @@ const { emitTaskEvent } = require('../services/socketService');
 const { notify } = require('../services/notificationService');
 const gridfs = require('../services/gridfsService');
 
-const STATUS_LABELS = { todo: 'To do', 'in-progress': 'In progress', 'in-review': 'In review', done: 'Done' };
+const STATUS_LABELS = { todo: 'To do', 'in-progress': 'In progress', 'in-review': 'In review', done: 'Done', 'not-approved': 'Not approved' };
+const NOT_APPROVED = 'not-approved';
+
+// Who may mark a task Not approved, or move it out of Not approved:
+// a Super Admin, the head of the team the task was sent to, or (for tasks
+// without a team) the head of the assignee's team.
+async function canApproveTask(user, task) {
+  if (isSuperAdmin(user)) return true;
+  if (task.toTeam) return isHeadOf(user, task.toTeam);
+  if (!task.assignee || user.role !== 'manager') return false;
+  const person = await User.findById(idStr(task.assignee)).select('department');
+  return Boolean(person && person.department && isHeadOf(user, person.department));
+}
 const PRIORITY_LABELS = { low: 'Low', medium: 'Medium', high: 'High', urgent: 'Urgent' };
 
 const logEmailError = (label) => (err) => console.error(`[email] ${label} failed:`, err.message);
@@ -130,6 +142,7 @@ const listAllTasks = catchAsync(async (req, res) => {
 const createTask = catchAsync(async (req, res) => {
   const { title, description, priority, assignee, labels, dueDate, status, blocked, toTeam } = req.body;
   if (!title || !String(title).trim()) throw new ApiError(400, 'title is required');
+  if (status === NOT_APPROVED) throw new ApiError(400, 'A new task cannot start as Not approved');
 
   const projectId = req.params.projectId || req.body.project;
   const team = await loadTeam(toTeam);
@@ -324,6 +337,18 @@ const updateTask = catchAsync(async (req, res) => {
     if (deadlineChanged && !canManage) throw new ApiError(403, `Only the ${team.name} head can set the deadline`);
     if (assigneeChanged && updates.assignee) await assertAssigneeInTeam(updates.assignee, team);
     if (!deadlineChanged) delete updates.dueDate;
+  }
+
+  // Not approved: only the team head (or a Super Admin) sets it or lifts it.
+  if ('status' in updates && updates.status !== task.status && (updates.status === NOT_APPROVED || task.status === NOT_APPROVED)) {
+    if (!(await canApproveTask(user, task))) {
+      throw new ApiError(
+        403,
+        task.status === NOT_APPROVED
+          ? 'This task is Not approved. Only the team head can change its status.'
+          : 'Only the team head can mark a task as Not approved'
+      );
+    }
   }
 
   const wasAlreadyDone = task.status === 'done';

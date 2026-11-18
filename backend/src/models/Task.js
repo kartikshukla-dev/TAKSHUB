@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
-const STATUSES = ['todo', 'in-progress', 'in-review', 'done'];
+// 'not-approved' can only be set (and cleared) by the team head or a Super Admin.
+const STATUSES = ['todo', 'in-progress', 'in-review', 'done', 'not-approved'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 
 const commentSchema = new mongoose.Schema(

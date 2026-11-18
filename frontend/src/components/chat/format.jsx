@@ -181,6 +181,7 @@ export function previewText(m) {
   if (m.deletedAt) return 'This message was deleted';
   if (m.text) return m.text;
   if (m.snippet) return `Snippet: ${m.snippet.title || m.snippet.language || 'code'}`;
+  if (m.media) return m.media.type === 'gif' ? 'GIF' : 'Sticker';
   if (m.files?.length) return `📎 ${m.files[0].filename}`;
   return '';
 }
