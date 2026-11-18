@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { hasSeenRelease } from '../utils/whatsNew';
 import PageTransition from './PageTransition';
 import ThemeToggle from './ThemeToggle';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +13,9 @@ import Icon, { BrandMark } from './Icon';
 import { Avatar } from './ui';
 import CommandPalette from './CommandPalette';
 import NotificationBell from './NotificationBell';
+
+// Loaded only when the modal opens.
+const WhatsNew = lazy(() => import('./WhatsNew'));
 
 const PERSONAL = [
   { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -145,6 +150,38 @@ function UserMenu() {
   );
 }
 
+// Opens once by itself for each new release, and any time from the button.
+function WhatsNewButton() {
+  const [open, setOpen] = useState(false);
+  const [unseen, setUnseen] = useState(() => !hasSeenRelease());
+  useEffect(() => {
+    if (!unseen) return undefined;
+    const t = setTimeout(() => setOpen(true), 800);
+    return () => clearTimeout(t);
+  }, [unseen]);
+  const close = () => {
+    setOpen(false);
+    setUnseen(false);
+  };
+  return (
+    <>
+      <button type="button" className="btn btn-secondary btn-sm whats-new-btn" onClick={() => setOpen(true)} title="What's new">
+        <Icon name="gift" size={15} />
+        <span className="whats-new-label">What&apos;s new</span>
+        {unseen && <span className="whats-new-dot" aria-label="New" />}
+      </button>
+      {/* Portal: the topbar is its own stacking context and would clip the modal. */}
+      {open &&
+        createPortal(
+          <Suspense fallback={null}>
+            <WhatsNew onClose={close} />
+          </Suspense>,
+          document.body
+        )}
+    </>
+  );
+}
+
 function Topbar({ onSearch }) {
   const { openNewTask } = useTaskUi();
   const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
@@ -159,6 +196,7 @@ function Topbar({ onSearch }) {
         <button type="button" className="btn btn-primary" onClick={() => openNewTask()}>
           <Icon name="plus" size={16} /> New task
         </button>
+        <WhatsNewButton />
         <ThemeToggle />
         <NotificationBell />
         <UserMenu />
