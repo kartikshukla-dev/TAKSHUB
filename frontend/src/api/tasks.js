@@ -26,8 +26,13 @@ export const updateTask = (projectId, taskId, payload) =>
 
 export const deleteTask = (projectId, taskId) => apiClient.delete(`/projects/${projectId}/tasks/${taskId}`);
 
-export const addComment = (projectId, taskId, text) =>
-  apiClient.post(`/projects/${projectId}/tasks/${taskId}/comments`, { text }).then((r) => r.data.task);
+// Returns { task, skippedMentions } (names of people who can't see the task).
+export const addComment = (projectId, taskId, text, mentions = []) =>
+  apiClient.post(`/projects/${projectId}/tasks/${taskId}/comments`, { text, mentions }).then((r) => r.data);
+export const editComment = (projectId, taskId, cid, text) =>
+  apiClient.patch(`/projects/${projectId}/tasks/${taskId}/comments/${cid}`, { text }).then((r) => r.data.task);
+export const deleteComment = (projectId, taskId, cid) =>
+  apiClient.delete(`/projects/${projectId}/tasks/${taskId}/comments/${cid}`).then((r) => r.data.task);
 
 export const uploadAttachment = (projectId, taskId, file) => {
   const formData = new FormData();

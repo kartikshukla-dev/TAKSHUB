@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 import { useSocket, useSocketEvent } from './SocketContext';
 import * as ws from '../api/workspace';
 import { playMessageSound } from '../utils/messageSounds';
-import { showNotification } from '../utils/pwa';
+import { disableWebPush, enableWebPush, showNotification, webPushActive } from '../utils/pwa';
 
 // Live, app-wide state fed by the socket: notifications, chat unread count,
 // the message sound and browser pop-up notifications.
@@ -21,6 +21,7 @@ export function LiveProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [chatUnread, setChatUnread] = useState(0);
   const [pushEnabled, setPushEnabledState] = useState(() => localStorage.getItem(PUSH_KEY) === 'on');
+  const [closedAppPush, setClosedAppPush] = useState(webPushActive);
   const [soundEnabled, setSoundEnabledState] = useState(() => localStorage.getItem(SOUND_KEY) !== 'off');
   const activeConversationRef = useRef(null);
   const { socket } = useSocket();
@@ -55,6 +56,7 @@ export function LiveProvider({ children }) {
   const popUp = (title, body, link) => {
     if (!pushEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     if (!document.hidden) return; // in-app UI already shows it
+    if (webPushActive()) return; // the server's push shows it instead
     showNotification(title, { body, link }).catch(() => {});
   };
 
@@ -125,15 +127,31 @@ export function LiveProvider({ children }) {
     setUnreadCount((c) => Math.max(0, c - 1));
   };
 
+  // Returns { closedApp: true } when this device also gets notifications
+  // while Tasks Manager is closed (Web Push), false when only while open.
   const setPushEnabled = async (on) => {
+    let closedApp = false;
     if (on) {
       if (typeof Notification === 'undefined') throw new Error('This browser does not support notifications');
       const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
       if (permission !== 'granted') throw new Error('Notifications are blocked for this site in your browser settings');
+      closedApp = await enableWebPush(ws.pushApi).catch(() => false);
+    } else {
+      await disableWebPush(ws.pushApi);
     }
     localStorage.setItem(PUSH_KEY, on ? 'on' : 'off');
     setPushEnabledState(on);
+    setClosedAppPush(closedApp);
+    return { closedApp };
   };
+
+  // People who already had pop-ups on get Web Push too, once the server has keys.
+  useEffect(() => {
+    if (!user || !pushEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    enableWebPush(ws.pushApi)
+      .then((ok) => setClosedAppPush(Boolean(ok)))
+      .catch(() => {});
+  }, [user, pushEnabled]);
 
   const setSoundEnabled = (on) => {
     localStorage.setItem(SOUND_KEY, on ? 'on' : 'off');
@@ -157,6 +175,7 @@ export function LiveProvider({ children }) {
         setActiveConversation,
         pushEnabled,
         setPushEnabled,
+        closedAppPush,
         soundEnabled,
         setSoundEnabled,
         presence,

@@ -4,6 +4,7 @@ const http = require('http');
 const createApp = require('./app');
 const { connectDB } = require('./config/db');
 const { initSocket } = require('./services/socketService');
+const { startScheduler } = require('./services/scheduler');
 
 async function start() {
   await connectDB();
@@ -12,6 +13,7 @@ async function start() {
   const httpServer = http.createServer(app);
 
   initSocket(httpServer);
+  startScheduler();
 
   const port = process.env.PORT || 5000;
   httpServer.listen(port, () => {

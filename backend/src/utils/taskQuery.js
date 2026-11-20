@@ -162,6 +162,7 @@ const TASK_POPULATE = [
   { path: 'fromTeam', select: 'name' },
   { path: 'toTeam', select: 'name' },
   { path: 'subtasks.assignee', select: USER_FIELDS },
+  { path: 'notApproved.by', select: 'name' },
 ];
 
 module.exports = {

@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import * as authApi from '../api/auth';
+import { pushApi } from '../api/workspace';
+import { disableWebPush } from '../utils/pwa';
 
 const AuthContext = createContext(null);
 
@@ -67,8 +69,14 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
-    // Fired before the token is cleared so the server knows who left.
-    if (localStorage.getItem('taskhub_token')) authApi.logoutServer?.();
+    // Fired before the token is cleared so the server knows who left, and
+    // so this device stops getting the last person's push notifications.
+    const current = localStorage.getItem('taskhub_token');
+    if (current) {
+      authApi.logoutServer?.();
+      // The session is cleared right away, so send the old token explicitly.
+      disableWebPush({ unsubscribe: (endpoint) => pushApi.unsubscribe(endpoint, current) }).catch(() => {});
+    }
     clearSession();
   };
 

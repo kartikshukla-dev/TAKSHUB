@@ -7,7 +7,10 @@ const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 const commentSchema = new mongoose.Schema(
   {
     author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    text: { type: String, required: true, trim: true },
+    text: { type: String, required: true, trim: true, maxlength: 5000 },
+    // People @mentioned in the comment (they get their own notification).
+    mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    editedAt: { type: Date, default: null },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
@@ -88,9 +91,31 @@ const taskSchema = new mongoose.Schema(
     attachments: [attachmentSchema],
     subtasks: [subtaskSchema],
     completedAt: { type: Date, default: null },
+    // Why the team head marked it Not approved (cleared when the status moves on).
+    notApproved: {
+      type: new mongoose.Schema(
+        {
+          reason: { type: String, required: true, trim: true, maxlength: 1000 },
+          by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+          at: { type: Date, required: true },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
+    // Deadline reminders already sent, keyed by the deadline they were for,
+    // so moving the deadline re-arms them.
+    reminders: {
+      dueSoonFor: { type: Date, default: null },
+      overdueFor: { type: Date, default: null },
+    },
+    // Set on tasks created by a repeating schedule (and on the first one).
+    recurring: { type: mongoose.Schema.Types.ObjectId, ref: 'RecurringTask', default: null, index: true },
   },
   { timestamps: true }
 );
+
+taskSchema.index({ status: 1, dueDate: 1 });
 
 // Fields we track in the activity log when changed via the "diff & update" helper.
 taskSchema.statics.TRACKED_FIELDS = ['status', 'priority', 'assignee', 'labels', 'dueDate', 'title', 'blocked', 'toTeam'];

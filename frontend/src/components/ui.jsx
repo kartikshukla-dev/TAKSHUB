@@ -12,9 +12,9 @@ export function Avatar({ user, size = 'md' }) {
   );
 }
 
-export function StatusPill({ status }) {
+export function StatusPill({ status, title }) {
   return (
-    <span className={`status-pill status-${status}`}>
+    <span className={`status-pill status-${status}`} title={title}>
       <span className="status-dot" />
       {STATUS_LABEL[status] || status}
     </span>

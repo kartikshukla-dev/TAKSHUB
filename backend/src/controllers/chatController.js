@@ -8,6 +8,7 @@ const gridfs = require('../services/gridfsService');
 const { emitToUsers, getPresence } = require('../services/socketService');
 const { notify } = require('../services/notificationService');
 const { resolveMedia, pushRecent } = require('./stickerController');
+const pushService = require('../services/pushService');
 
 const MEMBER_FIELDS = 'name email avatar jobTitle';
 const NAMED = ['group', 'channel'];
@@ -387,6 +388,23 @@ const sendMessage = catchAsync(async (req, res) => {
 
   // @mentions (and @channel / @here) also land in the bell.
   const pinged = mentionAll ? [...memberSet].filter((id) => id !== String(req.user._id)) : mentions;
+
+  // Web Push for everyone else in the chat (not muted). Mentioned people get
+  // the bell notification's push instead, so nobody gets two.
+  const mutedSet = new Set(conversation.mutedBy.map(idStr));
+  const pingedSet = new Set(pinged.map(String));
+  const pushTo = [...memberSet].filter((id) => id !== String(req.user._id) && !mutedSet.has(id) && !pingedSet.has(id));
+  if (pushTo.length) {
+    const where = conversation.type === 'channel' ? ` in #${conversation.name}` : conversation.type === 'group' ? ` in ${conversation.name}` : '';
+    pushService
+      .sendToUsers(pushTo, {
+        title: `${req.user.name}${where}`,
+        body: previewOf(message).slice(0, 200) || 'New message',
+        link: `/chat?c=${conversation._id}`,
+        tag: `chat:${conversation._id}`,
+      })
+      .catch(() => {});
+  }
   if (pinged.length) {
     notify(pinged, {
       actor: req.user._id,

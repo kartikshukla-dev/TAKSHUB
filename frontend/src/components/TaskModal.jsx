@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import * as tasksApi from '../api/tasks';
+
+// While the "why not approved" dialog is open, Escape closes only that.
+const noop = () => {};
 import { COMMENT_BADGES_SINCE } from '../utils/comments';
 import { useAuth } from '../context/AuthContext';
 import { useUsers, useDepartments } from '../hooks/useDirectory';
@@ -8,6 +12,9 @@ import { STATUSES, NOT_APPROVED, PRIORITIES, taskKey, projectIdOf, idOf, describ
 import { Avatar, Modal, Toggle } from './ui';
 import Icon from './Icon';
 import Subtasks from './Subtasks';
+import TaskComments from './TaskComments';
+import NotApprovedDialog from './NotApprovedDialog';
+import RepeatInfo from './RepeatInfo';
 
 export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
   const { userId, isAdmin, canManageTeam, canPlanTeamTask, canApproveTask } = useAuth();
@@ -17,8 +24,7 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
   const [title, setTitle] = useState(initialTask.title);
   const [description, setDescription] = useState(initialTask.description || '');
   const [labels, setLabels] = useState((initialTask.labels || []).join(', '));
-  const [commentText, setCommentText] = useState('');
-  const [posting, setPosting] = useState(false);
+  const [askReason, setAskReason] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   // When I last saw this task's comments before opening it (null while loading).
@@ -116,22 +122,6 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
     if (JSON.stringify(next) !== JSON.stringify(task.labels || [])) patch({ labels: next });
   };
 
-  const handleComment = async (e) => {
-    e.preventDefault();
-    if (!commentText.trim()) return;
-    setPosting(true);
-    try {
-      const updated = await tasksApi.addComment(projectId, task._id, commentText.trim());
-      setTask(updated);
-      emitTaskChange(updated);
-      setCommentText('');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Could not add comment');
-    } finally {
-      setPosting(false);
-    }
-  };
-
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -179,7 +169,7 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
   const lockedHint = task.toTeam?.name ? `Set by the ${task.toTeam.name} head` : '';
 
   return (
-    <Modal title={taskKey(task) || 'Task'} icon="listChecks" onClose={onClose} wide>
+    <Modal title={taskKey(task) || 'Task'} icon="listChecks" onClose={askReason ? noop : onClose} wide>
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="task-detail">
@@ -239,33 +229,19 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
 
           <section className="task-section">
             <h4>Comments</h4>
-            <ul className="comment-list">
-              {task.comments?.map((c) => (
-                <li key={c._id} className={`comment ${isNewComment(c) ? 'comment-new' : ''}`}>
-                  <Avatar user={c.author} size="sm" />
-                  <div>
-                    <div className="comment-meta">
-                      <strong>{c.author?.name || 'User'}</strong>
-                      <span className="muted small">{timeAgo(c.createdAt)}</span>
-                      {isNewComment(c) && <span className="comment-new-tag">New</span>}
-                    </div>
-                    <p className="comment-text">{c.text}</p>
-                  </div>
-                </li>
-              ))}
-              {(!task.comments || task.comments.length === 0) && <li className="muted small">No comments yet</li>}
-            </ul>
-            <form onSubmit={handleComment} className="comment-form">
-              <input
-                className="input"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder="Write a comment…"
-              />
-              <button type="submit" className="btn btn-primary" disabled={posting || !commentText.trim()}>
-                Post
-              </button>
-            </form>
+            <TaskComments
+              task={task}
+              projectId={projectId}
+              meId={userId}
+              isAdmin={isAdmin}
+              users={users}
+              isNew={isNewComment}
+              onTask={(updated) => {
+                setTask(updated);
+                emitTaskChange(updated);
+              }}
+              onError={setError}
+            />
           </section>
 
           <section className="task-section">
@@ -317,7 +293,7 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
             <select
               className="input"
               value={task.status}
-              onChange={(e) => patch({ status: e.target.value })}
+              onChange={(e) => (e.target.value === NOT_APPROVED ? setAskReason(true) : patch({ status: e.target.value }))}
               disabled={notApproved && !canApprove}
               title={notApproved && !canApprove ? 'Only the team head can change this' : undefined}
               aria-label="Status"
@@ -329,11 +305,23 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
               ))}
             </select>
             {notApproved && (
-              <span className="muted small not-approved-hint">
-                {canApprove ? 'Marked Not approved. Pick another status to approve it.' : 'Not approved by the team head. Only they can change the status.'}
-              </span>
+              <div className="not-approved-box">
+                {task.notApproved?.reason && (
+                  <>
+                    <strong>Why it was not approved</strong>
+                    <p className="not-approved-reason">{task.notApproved.reason}</p>
+                    <span className="muted small">
+                      {task.notApproved.by?.name || 'Team head'} · {timeAgo(task.notApproved.at)}
+                    </span>
+                  </>
+                )}
+                <span className="small not-approved-hint">
+                  {canApprove ? 'Pick another status once it is fixed to approve it.' : 'Only the team head can change the status.'}
+                </span>
+              </div>
             )}
           </div>
+          {task.recurring && <RepeatInfo id={idOf(task.recurring)} />}
           <div className="side-field">
             <span className="field-label">Priority</span>
             <select className="input" value={task.priority} onChange={(e) => patch({ priority: e.target.value })}>
@@ -412,6 +400,23 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
           )}
         </aside>
       </div>
+      {askReason &&
+        createPortal(
+          <NotApprovedDialog
+            task={task}
+            onCancel={() => setAskReason(false)}
+            onConfirm={async (reason) => {
+              try {
+                apply(await tasksApi.updateTask(projectId, task._id, { status: NOT_APPROVED, notApprovedReason: reason }));
+                setAskReason(false);
+                return null;
+              } catch (err) {
+                return err.response?.data?.message || 'Could not save';
+              }
+            }}
+          />,
+          document.body
+        )}
     </Modal>
   );
 }
