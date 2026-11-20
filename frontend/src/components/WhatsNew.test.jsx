@@ -16,20 +16,25 @@ beforeEach(() => {
 });
 
 describe("What's new", () => {
-  it('shows only this release, switches between entries and marks it seen', () => {
+  it('shows this release plus the comments / install entries, switches between them and marks it seen', () => {
     expect(hasSeenRelease()).toBe(false);
     const onClose = vi.fn();
     renderIt(onClose);
     expect(hasSeenRelease()).toBe(true);
     expect(screen.getByRole('heading', { name: 'Not approved, with a reason' })).toBeTruthy();
-    expect(screen.getByText('1 of 5')).toBeTruthy();
-    ['Deadline reminders', 'Notifications even when the app is closed', '@mention people in task comments', 'Repeating tasks'].forEach((t) =>
-      expect(screen.getByRole('button', { name: new RegExp(t) })).toBeTruthy()
-    );
-    // Older releases are gone.
-    expect(screen.queryByText('See new comments at a glance')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /Repeating tasks/ }));
-    expect(screen.getByRole('heading', { name: 'Repeating tasks' })).toBeTruthy();
+    expect(screen.getByText('1 of 7')).toBeTruthy();
+    [
+      'Deadline reminders',
+      'Notifications even when the app is closed',
+      '@mention people in task comments',
+      'Repeating tasks',
+      'See new comments at a glance',
+      'Install Tasks Manager as an app',
+    ].forEach((t) => expect(screen.getByRole('button', { name: new RegExp(t) })).toBeTruthy());
+    // Older releases (stickers etc.) stay gone.
+    expect(screen.queryByText('GIFs, emoji and stickers')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Install Tasks Manager as an app/ }));
+    expect(screen.getByRole('heading', { name: 'Install Tasks Manager as an app' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Next' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onClose).toHaveBeenCalled();

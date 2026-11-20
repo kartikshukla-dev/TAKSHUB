@@ -85,6 +85,38 @@ const FEATURES = [
     ],
     action: { label: 'Open my tasks', to: '/my-tasks' },
   },
+  // From the previous release, kept on request.
+  {
+    id: 'new-comments',
+    title: 'See new comments at a glance',
+    summary: 'Tasks show when someone has commented.',
+    image: '/whats-new/comment-badge.webp',
+    image2: '/whats-new/comment-new.webp',
+    alt: 'A task with a "1 new" comment badge',
+    lead: 'When someone comments on a task you are on, the task now shows a purple “1 new” badge in lists and on the board.',
+    points: [
+      'You get it on tasks you are assigned to, raised, commented on, or (as a Team Head) that involve your team.',
+      'Open the task and the new comments are marked “New”. The badge then goes away.',
+      'Your own comments never show as new. You still get the bell notification and email as before.',
+    ],
+    action: { label: 'Open my tasks', to: '/my-tasks' },
+  },
+  {
+    id: 'install-app',
+    title: 'Install Tasks Manager as an app',
+    summary: 'Its own window and icon on your computer or phone.',
+    image: '/icons/icon-512.png',
+    image2: '/whats-new/install-app.webp',
+    alt: 'Tasks Manager app icon',
+    lead: 'Tasks Manager can now be installed like a normal app.',
+    points: [
+      'Computer (Chrome / Edge): Settings → Install the app, or the install icon in the address bar.',
+      'Android: browser menu → “Install app” / “Add to Home screen”.',
+      'iPhone / iPad: open it in Safari → Share → “Add to Home Screen”.',
+      'It opens faster and in its own window. Your data still comes live from the server.',
+    ],
+    action: { label: 'Open Settings', to: '/settings' },
+  },
 ];
 
 export default function WhatsNew({ onClose }) {
