@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import { useSocket, useSocketEvent } from './SocketContext';
 import * as ws from '../api/workspace';
 import { playMessageSound } from '../utils/messageSounds';
+import { showNotification } from '../utils/pwa';
 
 // Live, app-wide state fed by the socket: notifications, chat unread count,
 // the message sound and browser pop-up notifications.
@@ -54,15 +55,7 @@ export function LiveProvider({ children }) {
   const popUp = (title, body, link) => {
     if (!pushEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     if (!document.hidden) return; // in-app UI already shows it
-    try {
-      const n = new Notification(title, { body, tag: link || title });
-      n.onclick = () => {
-        window.focus();
-        if (link) window.location.assign(link);
-      };
-    } catch {
-      /* some browsers block constructor-based notifications */
-    }
+    showNotification(title, { body, link }).catch(() => {});
   };
 
   useSocketEvent('notification:new', (n) => {

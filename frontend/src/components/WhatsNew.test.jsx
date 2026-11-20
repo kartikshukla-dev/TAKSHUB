@@ -29,8 +29,8 @@ describe("What's new", () => {
     const onClose = vi.fn();
     renderIt(onClose);
     expect(hasSeenRelease()).toBe(true);
-    expect(screen.getByRole('heading', { name: 'GIFs, emoji and stickers' })).toBeTruthy();
-    ['Make your own stickers', 'Save stickers you like', 'Not approved status', 'Meme message sounds'].forEach((t) =>
+    expect(screen.getByRole('heading', { name: 'See new comments at a glance' })).toBeTruthy();
+    ['Install Tasks Manager as an app', 'GIFs, emoji and stickers', 'Make your own stickers', 'Save stickers you like', 'Not approved status', 'Meme message sounds'].forEach((t) =>
       expect(screen.getByRole('button', { name: new RegExp(t) })).toBeTruthy()
     );
     fireEvent.click(screen.getByRole('button', { name: /Not approved status/ }));

@@ -4,6 +4,7 @@ import { taskKey, dueState, formatShortDate } from '../utils/format';
 import { Avatar, PriorityBadge } from './ui';
 import Icon from './Icon';
 import { SubtaskBadge } from './Subtasks';
+import CommentBadge from './CommentBadge';
 
 export default function TaskCard({ task, onOpen, isCompleting = false, onCompletingDone }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -62,6 +63,7 @@ export default function TaskCard({ task, onOpen, isCompleting = false, onComplet
         <PriorityBadge priority={task.priority} />
         <span className="task-card-meta">
           <SubtaskBadge task={task} />
+          <CommentBadge task={task} />
           {task.dueDate && <span className={`due due-${due || 'none'}`}>{formatShortDate(task.dueDate)}</span>}
           {task.assignee ? <Avatar user={task.assignee} size="xs" /> : <span className="avatar avatar-xs avatar-empty">?</span>}
         </span>

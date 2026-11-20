@@ -6,6 +6,8 @@ import { useLive } from '../context/LiveContext';
 import { useEffects } from '../context/EffectsContext';
 import { Card, PageHeader, Toggle } from '../components/ui';
 import { ThemePicker } from '../components/ThemeToggle';
+import Icon from '../components/Icon';
+import { canInstall, isIos, isStandalone, onInstallChange, promptInstall } from '../utils/pwa';
 import { ROLE_LABEL, WORKSPACE_NAME } from '../utils/format';
 import {
   MEME_SOUNDS,
@@ -131,6 +133,45 @@ function PushCard() {
         <Toggle checked={pushEnabled} onChange={change} label="Notifications on this device" disabled={!supported} />
       </div>
       {!supported && <p className="muted small">This browser doesn&apos;t support notifications.</p>}
+    </Card>
+  );
+}
+
+function InstallCard() {
+  const [installable, setInstallable] = useState(canInstall);
+  const [installed, setInstalled] = useState(isStandalone);
+  useEffect(() => onInstallChange(() => setInstallable(canInstall())), []);
+  const install = async () => {
+    if ((await promptInstall()) === 'accepted') setInstalled(true);
+  };
+
+  let body;
+  if (installed) body = <span className="muted small">Tasks Manager is installed on this device.</span>;
+  else if (installable) {
+    body = (
+      <button type="button" className="btn btn-primary btn-sm" onClick={install}>
+        <Icon name="download" size={14} /> Install app
+      </button>
+    );
+  } else if (isIos()) {
+    body = <span className="muted small">On iPhone / iPad: open this site in Safari, tap Share, then “Add to Home Screen”.</span>;
+  } else {
+    body = (
+      <span className="muted small">
+        Use the install icon in the browser’s address bar, or the browser menu → “Install Tasks Manager” / “Add to Home screen”.
+      </span>
+    );
+  }
+
+  return (
+    <Card title="Install the app" subtitle="Use Tasks Manager like a normal app on your computer or phone.">
+      <div className="setting-row">
+        <div>
+          <strong>App on this device</strong>
+          <span className="muted small">Opens in its own window with an icon on your desktop or home screen. Turn on push notifications below to get pop-ups.</span>
+        </div>
+        {body}
+      </div>
     </Card>
   );
 }
@@ -309,6 +350,7 @@ export default function Settings() {
     <div className="page page-narrow">
       <PageHeader title="Settings" subtitle="Your profile, password and notification preferences." />
       <ProfileCard />
+      <InstallCard />
       <PushCard />
       <SoundCard />
       <EffectsCard />

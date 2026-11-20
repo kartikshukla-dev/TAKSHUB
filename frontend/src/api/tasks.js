@@ -8,6 +8,11 @@ export const listTasks = (projectId) =>
 
 export const getTask = (projectId, taskId) =>
   apiClient.get(`/projects/${projectId}/tasks/${taskId}`).then((r) => r.data.task);
+// Same as getTask, plus when I had last seen its comments (before this open).
+export const getTaskDetail = (projectId, taskId) =>
+  apiClient.get(`/projects/${projectId}/tasks/${taskId}`).then((r) => r.data);
+export const markTaskSeen = (projectId, taskId) =>
+  apiClient.post(`/projects/${projectId}/tasks/${taskId}/seen`).then((r) => r.data.commentReads);
 
 // Without a project the task goes to the built-in "Team requests" project
 // (payload.toTeam is then required by the server).

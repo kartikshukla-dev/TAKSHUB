@@ -4,6 +4,7 @@ import { useEffects } from '../context/EffectsContext';
 import { Avatar, StatusPill, PriorityBadge } from './ui';
 import TaskPreview from './TaskPreview';
 import { SubtaskBadge } from './Subtasks';
+import CommentBadge from './CommentBadge';
 import Icon from './Icon';
 
 const HOVER_DELAY = 220;
@@ -74,6 +75,11 @@ export default function TaskTable({ tasks, onOpenTask, showProject = true }) {
                   {t.subtasks?.length > 0 && (
                     <span className="subtask-inline">
                       <SubtaskBadge task={t} />
+                    </span>
+                  )}
+                  {t.comments?.length > 0 && (
+                    <span className="subtask-inline">
+                      <CommentBadge task={t} />
                     </span>
                   )}
                   {t.blocked && (

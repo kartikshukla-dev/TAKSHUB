@@ -70,6 +70,20 @@ const taskSchema = new mongoose.Schema(
     labels: [{ type: String, trim: true }],
     dueDate: { type: Date, default: null },
     comments: [commentSchema],
+    // When each person last opened the task, so lists can show
+    // "2 new comments" to everyone except the one who wrote them.
+    commentReads: {
+      type: [
+        new mongoose.Schema(
+          {
+            user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+            at: { type: Date, required: true },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
     activityLog: [activityLogSchema],
     attachments: [attachmentSchema],
     subtasks: [subtaskSchema],
