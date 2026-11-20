@@ -21,6 +21,8 @@ const chatUpload = multer({
   limits: { fileSize: 10 * 1024 * 1024, files: 5, fieldSize: 1024 * 1024 },
 });
 const stickers = require('../controllers/stickerController');
+const pushApi = require('../controllers/pushController');
+const recurringApi = require('../controllers/recurringController');
 
 // Custom stickers: one image, 1 MB.
 const stickerUpload = multer({
@@ -40,7 +42,7 @@ const admin = requireRole('admin');
 
 // Auth only on this router's own paths, so unknown /api routes still 404.
 router.use(
-  ['/tasks', '/stats', '/activity', '/departments', '/todos', '/chat', '/notifications', '/search', '/admin', '/teams', '/invites'],
+  ['/tasks', '/stats', '/activity', '/departments', '/todos', '/chat', '/notifications', '/search', '/admin', '/teams', '/invites', '/push', '/recurring'],
   requireAuth
 );
 
@@ -103,6 +105,15 @@ router.get('/chat/stickers/:id/image', stickers.stickerImage);
 router.patch('/chat/stickers/:id', stickers.updateSticker);
 router.delete('/chat/stickers/:id', stickers.deleteSticker);
 router.get('/chat/giphy/:kind', stickers.giphySearch);
+
+// Web Push (notifications when the app is closed).
+router.get('/push/config', pushApi.getConfig);
+router.post('/push/subscriptions', pushApi.subscribe);
+router.delete('/push/subscriptions', pushApi.unsubscribe);
+
+// Repeating tasks.
+router.get('/recurring/:id', recurringApi.getRecurring);
+router.patch('/recurring/:id', recurringApi.updateRecurring);
 
 router.get('/notifications', listNotifications);
 router.post('/notifications/read-all', markAllRead);

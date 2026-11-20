@@ -54,7 +54,14 @@ export default function NotificationBell() {
                   className={`notif-item ${n.read ? '' : 'notif-unread'}`}
                   onClick={() => openNotification(n)}
                 >
-                  <Avatar user={n.actor} size="sm" />
+                  {n.actor ? (
+                    <Avatar user={n.actor} size="sm" />
+                  ) : (
+                    // Sent by Tasks Manager itself (deadline reminders).
+                    <span className="avatar avatar-sm notif-system" aria-hidden="true">
+                      <Icon name="bell" size={13} />
+                    </span>
+                  )}
                   <span className="notif-body">
                     <span>{n.text}</span>
                     <span className="muted small">{timeAgo(n.createdAt)}</span>

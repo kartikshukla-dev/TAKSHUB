@@ -47,6 +47,8 @@ const TONES = {
   team: { accent: '#6d3fd1', bg: '#f1eafe', icon: '&#8594;' },
   update: { accent: '#1d6fb8', bg: '#e3f0fb', icon: '&#8635;' },
   security: { accent: '#b45309', bg: '#fdf3e3', icon: '&#9888;' },
+  warning: { accent: '#b45309', bg: '#fdf3e3', icon: '!' },
+  danger: { accent: '#b42318', bg: '#fdecea', icon: '!' },
 };
 
 function esc(value) {
@@ -542,6 +544,36 @@ function taskComment({ task, project, actor, comment }) {
   };
 }
 
+// Deadline reminder: kind = 'due-soon' (due tomorrow) | 'overdue'.
+function taskReminder({ task, project, recipient, kind }) {
+  const link = taskLink(task, project);
+  const overdue = kind === 'overdue';
+  const due = formatDate(task.dueDate, false);
+  const forAssignee = task.assignee && recipient && String(task.assignee._id || task.assignee) === String(recipient._id);
+  const lead = overdue
+    ? forAssignee
+      ? `The deadline for this task was <strong>${esc(due)}</strong> and it isn&apos;t done yet. Please finish it or update the team.`
+      : `This task from your team passed its deadline (<strong>${esc(due)}</strong>) and isn&apos;t done yet. It is assigned to <strong>${esc(task.assignee?.name || 'nobody')}</strong>.`
+    : `Just a reminder: this task is due <strong>tomorrow, ${esc(due)}</strong>.`;
+  const html = layout({
+    preheader: `${taskKey(task, project) || ''} ${overdue ? 'is overdue' : 'is due tomorrow'}: ${task.title}`,
+    heading: overdue ? 'Task overdue 🚨' : 'Due tomorrow ⏰',
+    body: [
+      paragraph(`Hi ${esc(firstName(recipient))}, ${lead}`),
+      spacer(12),
+      banner(overdue ? 'danger' : 'warning', overdue ? `Overdue since ${due}` : `Due ${due}`),
+      taskCard(task, project, [['Assignee', esc(task.assignee?.name || 'Unassigned')]]),
+      cta('Open task', link),
+    ].join(''),
+    footerNote: overdue ? `You're receiving this because you're on this task or lead its team.` : `You're receiving this because the task is assigned to you.`,
+  });
+  return {
+    subject: `${subjectPrefix(task, project)} ${overdue ? 'Overdue' : 'Due tomorrow'}: ${task.title}`,
+    html,
+    text: `${overdue ? `Overdue since ${due}` : `Due tomorrow (${due})`}\n\n${textCard(task, project)}\n\nOpen: ${link}`,
+  };
+}
+
 function testEmail({ user, provider }) {
   const html = layout({
     preheader: 'Email delivery is working.',
@@ -595,6 +627,8 @@ function previews() {
     }),
     'task-completed': taskCompleted({ task: { ...withDeadline, status: 'done', completedAt: new Date() }, project, assignee: member, reporter: raiser }),
     'task-comment': taskComment({ task: withDeadline, project, actor: head, comment: 'Rahul has started on this. We will share a draft by Wednesday.' }),
+    'task-due-soon': taskReminder({ task: { ...withDeadline, dueDate: new Date(Date.now() + 86400000) }, project, recipient: member, kind: 'due-soon' }),
+    'task-overdue': taskReminder({ task: { ...withDeadline, dueDate: new Date(Date.now() - 86400000) }, project, recipient: head, kind: 'overdue' }),
   };
 }
 
@@ -607,6 +641,7 @@ module.exports = {
   taskUpdated,
   taskCompleted,
   taskComment,
+  taskReminder,
   testEmail,
   previews,
   esc,

@@ -8,6 +8,8 @@ const {
   updateTask,
   deleteTask,
   addComment,
+  editComment,
+  deleteComment,
   markTaskSeen,
   uploadAttachment,
   downloadAttachment,
@@ -29,6 +31,8 @@ router.patch('/:id', updateTask);
 router.delete('/:id', deleteTask);
 
 router.post('/:id/comments', addComment);
+router.patch('/:id/comments/:cid', editComment);
+router.delete('/:id/comments/:cid', deleteComment);
 router.post('/:id/seen', markTaskSeen);
 
 router.post('/:id/attachments', upload.single('file'), uploadAttachment);

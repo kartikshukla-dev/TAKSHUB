@@ -55,17 +55,17 @@ const patch = (u, t, body) => request(app).patch(`/api/projects/${t.project._id}
 describe('Not approved status', () => {
   it('only the team head can mark a task Not approved', async () => {
     const t = await teamTask();
-    expect((await patch(dev2, t, { status: 'not-approved' })).status).toBe(403);
-    expect((await patch(dev1, t, { status: 'not-approved' })).status).toBe(403);
-    expect((await patch(opsHead, t, { status: 'not-approved' })).status).toBe(403);
-    const res = await patch(head, t, { status: 'not-approved' });
+    expect((await patch(dev2, t, { status: 'not-approved', notApprovedReason: 'Numbers are wrong' })).status).toBe(403);
+    expect((await patch(dev1, t, { status: 'not-approved', notApprovedReason: 'Numbers are wrong' })).status).toBe(403);
+    expect((await patch(opsHead, t, { status: 'not-approved', notApprovedReason: 'Numbers are wrong' })).status).toBe(403);
+    const res = await patch(head, t, { status: 'not-approved', notApprovedReason: 'Numbers are wrong' });
     expect(res.status).toBe(200);
     expect(res.body.task.status).toBe('not-approved');
   });
 
   it('once Not approved, only the head (or a Super Admin) can change the status', async () => {
     const t = await teamTask();
-    await patch(head, t, { status: 'not-approved' });
+    await patch(head, t, { status: 'not-approved', notApprovedReason: 'Numbers are wrong' });
     const blocked = await patch(dev2, t, { status: 'in-progress' });
     expect(blocked.status).toBe(403);
     expect(blocked.body.message).toMatch(/Only the team head/);
@@ -74,13 +74,13 @@ describe('Not approved status', () => {
 
     const reopened = await patch(head, t, { status: 'todo' });
     expect(reopened.body.task.status).toBe('todo');
-    await patch(admin, t, { status: 'not-approved' });
+    await patch(admin, t, { status: 'not-approved', notApprovedReason: 'Numbers are wrong' });
     expect((await patch(admin, t, { status: 'done' })).body.task.status).toBe('done');
   });
 
   it('team members can see and filter Not approved tasks', async () => {
     const t = await teamTask();
-    await patch(head, t, { status: 'not-approved' });
+    await patch(head, t, { status: 'not-approved', notApprovedReason: 'Numbers are wrong' });
     const list = await request(app).get('/api/tasks?status=not-approved').set(auth(dev2));
     expect(list.status).toBe(200);
     expect(list.body.tasks.map((x) => String(x._id))).toContain(String(t._id));

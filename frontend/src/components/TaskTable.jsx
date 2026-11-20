@@ -89,7 +89,7 @@ export default function TaskTable({ tasks, onOpenTask, showProject = true }) {
                   )}
                 </td>
                 <td>
-                  <StatusPill status={t.status} />
+                  <StatusPill status={t.status} title={t.notApproved?.reason ? `Not approved: ${t.notApproved.reason}` : undefined} />
                 </td>
                 <td>
                   <PriorityBadge priority={t.priority} />

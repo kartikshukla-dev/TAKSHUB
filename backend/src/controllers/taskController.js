@@ -14,6 +14,9 @@ const { formatDate } = require('../services/emailTemplates');
 const { emitTaskEvent } = require('../services/socketService');
 const { notify } = require('../services/notificationService');
 const gridfs = require('../services/gridfsService');
+const RecurringTask = require('../models/RecurringTask');
+const recurring = require('../services/recurringService');
+const { istDay, daysBetween, deadlineDay } = require('../utils/istDate');
 
 const STATUS_LABELS = { todo: 'To do', 'in-progress': 'In progress', 'in-review': 'In review', done: 'Done', 'not-approved': 'Not approved' };
 const NOT_APPROVED = 'not-approved';
@@ -164,6 +167,16 @@ const createTask = catchAsync(async (req, res) => {
     .slice(0, Task.SUBTASK_MAX);
   if (subtasks.some((t) => t.length > 300)) throw new ApiError(400, 'Subtask title is too long');
 
+  // Optional repeat: { freq: daily | weekdays | weekly | monthly, weekday?, dayOfMonth? }
+  let schedule = null;
+  if (req.body.repeat && req.body.repeat.freq) {
+    try {
+      schedule = recurring.parseSchedule(req.body.repeat);
+    } catch (err) {
+      throw new ApiError(400, err.message);
+    }
+  }
+
   const seq = await Project.findByIdAndUpdate(project._id, { $inc: { taskSeq: 1 } }, { new: true });
 
   const task = await Task.create({
@@ -187,6 +200,28 @@ const createTask = catchAsync(async (req, res) => {
       ...(team ? [{ field: 'toTeam', oldValue: null, newValue: team.name, changedBy: req.user._id }] : []),
     ],
   });
+
+  // This task is the first one; the schedule makes the next ones.
+  if (schedule) {
+    const today = istDay();
+    const rt = await RecurringTask.create({
+      createdBy: req.user._id,
+      project: project._id,
+      toTeam: task.toTeam,
+      fromTeam: task.fromTeam,
+      title: task.title,
+      description: task.description || '',
+      priority: task.priority,
+      assignee: task.assignee,
+      labels: task.labels,
+      subtasks,
+      dueInDays: task.dueDate ? Math.max(0, daysBetween(today, deadlineDay(task.dueDate))) : null,
+      schedule,
+      nextRunAt: recurring.nextRunAt(schedule, today),
+    });
+    task.recurring = rt._id;
+    await Task.updateOne({ _id: task._id }, { recurring: rt._id }, { timestamps: false });
+  }
 
   const populated = await task.populate(TASK_POPULATE);
   emitTaskEvent(project, populated, 'task:created', populated);
@@ -297,10 +332,11 @@ async function describeChanges(entries) {
     toTeam: (v) => nameOf(teams, v, 'No team'),
     blocked: (v) => (v ? 'Blocked' : 'Not blocked'),
     title: (v) => v || '—',
+    notApprovedReason: (v) => v || '—',
   };
-  const labels = { status: 'Status', priority: 'Priority', dueDate: 'Deadline', assignee: 'Assignee', toTeam: 'Team', blocked: 'Blocked', title: 'Title' };
+  const labels = { status: 'Status', priority: 'Priority', dueDate: 'Deadline', assignee: 'Assignee', toTeam: 'Team', blocked: 'Blocked', title: 'Title', notApprovedReason: 'Reason' };
   // Deadline first: it's the change people care about most.
-  const order = ['dueDate', 'assignee', 'status', 'toTeam', 'priority', 'blocked', 'title'];
+  const order = ['dueDate', 'assignee', 'status', 'notApprovedReason', 'toTeam', 'priority', 'blocked', 'title'];
   return entries
     .filter((e) => fmt[e.field])
     .sort((a, b) => order.indexOf(a.field) - order.indexOf(b.field))
@@ -361,6 +397,15 @@ const updateTask = catchAsync(async (req, res) => {
       );
     }
   }
+  // Marking Not approved needs a reason, so the assignee knows what to fix.
+  let notApprovedReason = null;
+  const markingNotApproved = 'status' in updates && updates.status === NOT_APPROVED && task.status !== NOT_APPROVED;
+  if (markingNotApproved) {
+    notApprovedReason = String(updates.notApprovedReason || '').trim();
+    if (notApprovedReason.length < 3) throw new ApiError(400, 'Add a reason so the team knows what to fix');
+    if (notApprovedReason.length > 1000) throw new ApiError(400, 'Reason is too long (1000 characters max)');
+  }
+  delete updates.notApprovedReason;
 
   const wasAlreadyDone = task.status === 'done';
   const previousAssignee = idStr(task.assignee);
@@ -387,6 +432,13 @@ const updateTask = catchAsync(async (req, res) => {
     if (field in updates) task[field] = updates[field];
   });
   if ('description' in updates) task.description = updates.description;
+  if (markingNotApproved) {
+    task.notApproved = { reason: notApprovedReason, by: user._id, at: new Date() };
+    logEntries.push({ field: 'notApprovedReason', oldValue: null, newValue: notApprovedReason, changedBy: user._id, changedAt: new Date() });
+    auditChanges.notApprovedReason = { from: null, to: notApprovedReason };
+  } else if (task.status !== NOT_APPROVED && task.notApproved) {
+    task.notApproved = null;
+  }
 
   const transitioningToDone = !wasAlreadyDone && task.status === 'done';
   if (transitioningToDone) task.completedAt = new Date();
@@ -438,8 +490,14 @@ const updateTask = catchAsync(async (req, res) => {
   // 3. Everyone else following the task hears about the changes.
   if (changes.length) {
     const others = watchers.filter((id) => id !== idStr(user._id) && !(assignedNow && id === newAssignee));
-    const summary = changes.map((c) => (c.field === 'dueDate' ? `deadline ${c.to}` : `${c.label.toLowerCase()} ${c.to}`)).join(', ');
-    notify(others, { actor: user._id, type: 'task_updated', text: `${user.name} updated ${ref}: ${summary}`, link });
+    const summary = changes
+      .filter((c) => c.field !== 'notApprovedReason')
+      .map((c) => (c.field === 'dueDate' ? `deadline ${c.to}` : `${c.label.toLowerCase()} ${c.to}`))
+      .join(', ');
+    const text = markingNotApproved
+      ? `${user.name} marked ${ref} Not approved: “${notApprovedReason.slice(0, 160)}”`
+      : `${user.name} updated ${ref}: ${summary}`;
+    notify(others, { actor: user._id, type: markingNotApproved ? 'task_not_approved' : 'task_updated', text, link });
 
     if (transitioningToDone) {
       const people = await emailable(watchers, [user._id]);
@@ -493,14 +551,32 @@ const markTaskSeen = catchAsync(async (req, res) => {
   res.status(200).json({ commentReads: [...(task.commentReads || []).filter((r) => !sameId(r.user, req.user._id)), { user: req.user._id, at }] });
 });
 
+const COMMENT_MAX = 5000;
+
+// Of the @mentioned ids, the active people who can open this task. Others
+// are reported back so the writer knows they weren't told.
+async function resolveMentions(ids, task, project, author) {
+  const wanted = [...new Set((Array.isArray(ids) ? ids : []).map(String))]
+    .filter((id) => mongoose.Types.ObjectId.isValid(id) && id !== idStr(author._id))
+    .slice(0, 20);
+  if (!wanted.length) return { mentioned: [], skipped: [] };
+  const people = await User.find({ _id: { $in: wanted }, status: { $ne: 'disabled' } }).select('name role department');
+  const mentioned = [];
+  const skipped = [];
+  people.forEach((p) => (canViewTask(p, task, project) ? mentioned : skipped).push(p));
+  return { mentioned, skipped };
+}
+
 const addComment = catchAsync(async (req, res) => {
-  const { text } = req.body;
-  if (!text || !String(text).trim()) throw new ApiError(400, 'text is required');
+  const text = String(req.body.text || '').trim();
+  if (!text) throw new ApiError(400, 'text is required');
+  if (text.length > COMMENT_MAX) throw new ApiError(400, `Comment is too long (${COMMENT_MAX} characters max)`);
 
   const project = await loadProject(req.params.projectId);
   const task = await loadTask(req, project);
+  const { mentioned, skipped } = await resolveMentions(req.body.mentions, task, project, req.user);
 
-  task.comments.push({ author: req.user._id, text });
+  task.comments.push({ author: req.user._id, text, mentions: mentioned.map((p) => p._id) });
   task.activityLog.push({ field: 'comment', oldValue: null, newValue: text, changedBy: req.user._id, changedAt: new Date() });
   // The writer has obviously seen their own comment.
   task.commentReads = [...(task.commentReads || []).filter((r) => !sameId(r.user, req.user._id)), { user: req.user._id, at: new Date() }];
@@ -513,22 +589,81 @@ const addComment = catchAsync(async (req, res) => {
   ]);
   emitTaskEvent(project, populated, 'task:commented', populated);
 
-  res.status(201).json({ task: populated });
+  res.status(201).json({ task: populated, skippedMentions: skipped.map((p) => p.name) });
   afterResponse('task-comment', async () => {
-  const others = (await watcherIds(populated)).filter((id) => id !== idStr(req.user._id));
+  const ref = taskRef(task, project);
+  const link = taskLink(task, project);
+  const mentionedIds = mentioned.map((p) => idStr(p._id));
+  // @mentioned people get "mentioned you"; everyone else following gets "commented".
+  notify(mentionedIds, {
+    actor: req.user._id,
+    type: 'task_mention',
+    text: `${req.user.name} mentioned you on ${ref}: “${text.slice(0, 140)}”`,
+    link,
+  });
+  const others = (await watcherIds(populated)).filter((id) => id !== idStr(req.user._id) && !mentionedIds.includes(id));
   notify(others, {
     actor: req.user._id,
     type: 'task_comment',
-    text: `${req.user.name} commented on ${taskRef(task, project)}: ${task.title}`,
-    link: taskLink(task, project),
+    text: `${req.user.name} commented on ${ref}: ${task.title}`,
+    link,
   });
-  const people = await emailable(others);
+  const people = await emailable([...others, ...mentionedIds]);
   if (people.length) {
     emails
       .sendTaskCommentEmail({ task: populated, project, recipients: people, actor: req.user, comment: text })
       .catch(logEmailError('task-comment'));
   }
   });
+});
+
+async function loadOwnComment(req) {
+  const project = await loadProject(req.params.projectId);
+  const task = await loadTask(req, project);
+  const comment = task.comments.id(req.params.cid);
+  if (!comment) throw new ApiError(404, 'Comment not found');
+  return { project, task, comment };
+}
+
+async function replyWithTask(res, project, task, status = 200) {
+  const populated = await task.populate([
+    ...TASK_POPULATE,
+    { path: 'comments.author', select: USER_FIELDS },
+    { path: 'activityLog.changedBy', select: USER_FIELDS },
+  ]);
+  emitTaskEvent(project, populated, 'task:commented', populated);
+  res.status(status).json({ task: populated });
+}
+
+// PATCH /api/projects/:projectId/tasks/:id/comments/:cid { text } : your own comments only.
+const editComment = catchAsync(async (req, res) => {
+  const { project, task, comment } = await loadOwnComment(req);
+  if (!sameId(comment.author, req.user._id)) throw new ApiError(403, 'You can only edit your own comments');
+  const text = String(req.body.text || '').trim();
+  if (!text) throw new ApiError(400, 'Comment cannot be empty');
+  if (text.length > COMMENT_MAX) throw new ApiError(400, `Comment is too long (${COMMENT_MAX} characters max)`);
+  if (text !== comment.text) {
+    req.audit = { entity: 'task', entityId: task._id, entityLabel: `${taskRef(task, project)} ${task.title}`, changes: { comment: { from: comment.text, to: text } } };
+    comment.text = text;
+    comment.editedAt = new Date();
+    // Keep only mentions whose name is still in the text; people newly
+    // mentioned while editing are not notified again.
+    await task.populate({ path: 'comments.mentions', select: 'name' });
+    comment.mentions = (comment.mentions || []).filter((m) => m && text.includes(`@${m.name}`)).map((m) => m._id);
+    await task.save();
+  }
+  await replyWithTask(res, project, task);
+});
+
+// DELETE /api/projects/:projectId/tasks/:id/comments/:cid : the author or a Super Admin.
+const deleteComment = catchAsync(async (req, res) => {
+  const { project, task, comment } = await loadOwnComment(req);
+  if (!sameId(comment.author, req.user._id) && !isSuperAdmin(req.user)) throw new ApiError(403, 'You can only delete your own comments');
+  req.audit = { entity: 'task', entityId: task._id, entityLabel: `${taskRef(task, project)} ${task.title}`, changes: { deletedComment: { from: comment.text, to: null } } };
+  comment.deleteOne();
+  task.activityLog.push({ field: 'commentDeleted', oldValue: null, newValue: null, changedBy: req.user._id, changedAt: new Date() });
+  await task.save();
+  await replyWithTask(res, project, task);
 });
 
 const uploadAttachment = catchAsync(async (req, res) => {
@@ -727,6 +862,8 @@ module.exports = {
   updateTask,
   deleteTask,
   addComment,
+  editComment,
+  deleteComment,
   markTaskSeen,
   uploadAttachment,
   downloadAttachment,

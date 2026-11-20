@@ -146,6 +146,10 @@ export function describeActivity(entry) {
       return `${who} created the task`;
     case 'comment':
       return `${who} commented`;
+    case 'commentDeleted':
+      return `${who} deleted a comment`;
+    case 'notApprovedReason':
+      return `${who} gave the reason: “${entry.newValue || ''}”`;
     case 'subtask':
     {
       // newValue reads like "completed: Write notes" or "assigned Neha: QA".

@@ -56,6 +56,19 @@ export const searchChat = (q) => apiClient.get('/chat/search', { params: { q } }
 export const getPresence = () => apiClient.get('/chat/presence').then((r) => r.data.presence);
 export const fetchChatFile = (mid, fileId, inline = false) =>
   apiClient.get(`/chat/messages/${mid}/files/${fileId}`, { params: inline ? { inline: 1 } : {}, responseType: 'blob' }).then((r) => r.data);
+// Web Push.
+export const pushApi = {
+  getConfig: () => apiClient.get('/push/config').then((r) => r.data),
+  subscribe: (subscription) => apiClient.post('/push/subscriptions', { subscription }),
+  // `token` is passed on log out, when the stored session is already gone.
+  unsubscribe: (endpoint, token) =>
+    apiClient.delete('/push/subscriptions', { data: { endpoint }, headers: token ? { Authorization: `Bearer ${token}` } : undefined }),
+};
+
+// Repeating tasks.
+export const getRecurring = (id) => apiClient.get(`/recurring/${id}`).then((r) => r.data.recurring);
+export const updateRecurring = (id, payload) => apiClient.patch(`/recurring/${id}`, payload).then((r) => r.data.recurring);
+
 // Stickers and GIFs.
 export const listStickers = () => apiClient.get('/chat/stickers').then((r) => r.data);
 export const uploadSticker = ({ file, name, global }) => {

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useUsers, useProjects, useDepartments } from '../hooks/useDirectory';
 import { emitTaskChange } from '../utils/taskEvents';
 import { CREATE_STATUSES, PRIORITIES, idOf, projectIdOf } from '../utils/format';
+import { WEEKDAYS, istToday, scheduleLabel } from '../utils/repeat';
 import { Modal } from './ui';
 import Icon from './Icon';
 
@@ -38,6 +39,11 @@ export default function CreateTaskModal({ defaults = {}, onClose, onCreated }) {
     setSubtasks((prev) => [...prev, t]);
     setSubDraft('');
   };
+  // Repeat: '' | daily | weekdays | weekly | monthly (defaults to today's day).
+  const [repeat, setRepeat] = useState('');
+  const [weekday, setWeekday] = useState(() => istToday().weekday);
+  const [dayOfMonth, setDayOfMonth] = useState(() => istToday().dayOfMonth);
+  const repeatSchedule = repeat ? { freq: repeat, weekday, dayOfMonth } : null;
   const [progress, setProgress] = useState('');
   // Set when the task was created but some files failed: no second submit.
   const [createdTask, setCreatedTask] = useState(null);
@@ -92,6 +98,7 @@ export default function CreateTaskModal({ defaults = {}, onClose, onCreated }) {
       // A typed but not yet added subtask is kept too.
       const subs = [...subtasks, subDraft.trim()].filter(Boolean);
       if (subs.length) payload.subtasks = subs;
+      if (repeatSchedule) payload.repeat = repeatSchedule;
       if (!toTeam) payload.status = status;
       if (canPlan) {
         payload.assignee = assignee || null;
@@ -260,6 +267,49 @@ export default function CreateTaskModal({ defaults = {}, onClose, onCreated }) {
             <label htmlFor="task-labels">Labels</label>
             <input id="task-labels" className="input" value={labelsInput} placeholder="comma separated" onChange={(e) => setLabelsInput(e.target.value)} />
           </div>
+          <div className="field">
+            <label htmlFor="task-repeat">Repeat</label>
+            <select id="task-repeat" className="input" value={repeat} onChange={(e) => setRepeat(e.target.value)}>
+              <option value="">Doesn&apos;t repeat</option>
+              <option value="daily">Every day</option>
+              <option value="weekdays">Every weekday (Mon–Fri)</option>
+              <option value="weekly">Every week</option>
+              <option value="monthly">Every month</option>
+            </select>
+          </div>
+          {repeat === 'weekly' && (
+            <div className="field">
+              <label htmlFor="task-repeat-day">On</label>
+              <select id="task-repeat-day" className="input" value={weekday} onChange={(e) => setWeekday(Number(e.target.value))}>
+                {WEEKDAYS.map((d, i) => (
+                  <option key={d} value={i}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {repeat === 'monthly' && (
+            <div className="field">
+              <label htmlFor="task-repeat-dom">On day</label>
+              <select id="task-repeat-dom" className="input" value={dayOfMonth} onChange={(e) => setDayOfMonth(Number(e.target.value))}>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {repeat && (
+            <div className="field field-span">
+              <div className="hint-box">
+                <Icon name="refresh" size={13} /> This task is the first one. {scheduleLabel(repeatSchedule)} at 9:00 AM a new copy is created
+                {canPlan && assignee ? ' and assigned to the same person' : ''}
+                {canPlan && dueDate ? ', with the deadline the same number of days later' : ''}. You can stop it from the task.
+              </div>
+            </div>
+          )}
         </div>
         <div className="field">
           <label htmlFor="task-subtask">Subtasks</label>

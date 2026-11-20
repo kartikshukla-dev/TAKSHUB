@@ -9,7 +9,7 @@
  *
  * Bump VERSION to throw away old caches.
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL = `tm-shell-${VERSION}`;
 const ASSETS = `tm-assets-${VERSION}`;
 const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/logo.png', '/icons/icon-192.png', '/icons/icon-512.png'];
@@ -83,6 +83,31 @@ self.addEventListener('fetch', (event) => {
       )
     );
   }
+});
+
+// Web Push from the server (works when the app is closed). If Tasks Manager
+// is open and in front, the page already shows it, so stay quiet.
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : '' };
+  }
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      const inFront = list.some((c) => c.visibilityState === 'visible' && c.focused);
+      if (inFront) return undefined;
+      return self.registration.showNotification(data.title || 'Tasks Manager', {
+        body: data.body || '',
+        tag: data.tag || undefined,
+        renotify: Boolean(data.tag),
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        data: { link: data.link || '/dashboard' },
+      });
+    })
+  );
 });
 
 // Notification clicks: focus an open window (and move it to the link) or open one.
