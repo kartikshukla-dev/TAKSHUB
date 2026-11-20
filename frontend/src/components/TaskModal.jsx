@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as tasksApi from '../api/tasks';
+import { COMMENT_BADGES_SINCE } from '../utils/comments';
 import { useAuth } from '../context/AuthContext';
 import { useUsers, useDepartments } from '../hooks/useDirectory';
 import { emitTaskChange } from '../utils/taskEvents';
@@ -20,26 +21,49 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
   const [posting, setPosting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  // When I last saw this task's comments before opening it (null while loading).
+  const [seenBefore, setSeenBefore] = useState(null);
 
   const projectId = projectIdOf(task);
 
   // List rows don't carry comments/activity, so load the full task.
+  // Opening it also marks the comments as seen on the server.
   useEffect(() => {
     let cancelled = false;
     tasksApi
-      .getTask(projectIdOf(initialTask), initialTask._id)
-      .then((full) => {
+      .getTaskDetail(projectIdOf(initialTask), initialTask._id)
+      .then(({ task: full, commentsSeenAt }) => {
         if (cancelled) return;
         setTask(full);
         setTitle(full.title);
         setDescription(full.description || '');
         setLabels((full.labels || []).join(', '));
+        setSeenBefore(commentsSeenAt ? new Date(commentsSeenAt) : COMMENT_BADGES_SINCE);
+        // Clears the "new comments" badge on the card / row behind the modal.
+        emitTaskChange(full);
       })
       .catch((err) => !cancelled && setError(err.response?.data?.message || 'Could not load task'));
     return () => {
       cancelled = true;
     };
   }, [initialTask]);
+
+  // Comments that arrive while the modal is open are seen too.
+  const latest = useRef(task);
+  latest.current = task;
+  useEffect(
+    () => () => {
+      const t = latest.current;
+      if (!t?.comments?.length) return;
+      tasksApi
+        .markTaskSeen(projectIdOf(t), t._id)
+        .then((commentReads) => emitTaskChange({ ...t, commentReads }))
+        .catch(() => {});
+    },
+    []
+  );
+  const isNewComment = (c) =>
+    seenBefore && idOf(c.author) !== userId && c.createdAt && new Date(c.createdAt) > seenBefore;
 
   const apply = (updated) => {
     // PATCH responses omit populated comment authors; keep what we have.
@@ -217,12 +241,13 @@ export default function TaskModal({ task: initialTask, onClose, onUpdated }) {
             <h4>Comments</h4>
             <ul className="comment-list">
               {task.comments?.map((c) => (
-                <li key={c._id} className="comment">
+                <li key={c._id} className={`comment ${isNewComment(c) ? 'comment-new' : ''}`}>
                   <Avatar user={c.author} size="sm" />
                   <div>
                     <div className="comment-meta">
                       <strong>{c.author?.name || 'User'}</strong>
                       <span className="muted small">{timeAgo(c.createdAt)}</span>
+                      {isNewComment(c) && <span className="comment-new-tag">New</span>}
                     </div>
                     <p className="comment-text">{c.text}</p>
                   </div>

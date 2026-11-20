@@ -36,8 +36,11 @@ export function AuthProvider({ children }) {
         const data = await authApi.fetchMe();
         setUser(data.user);
         localStorage.setItem('taskhub_user', JSON.stringify(data.user));
-      } catch {
-        clearSession();
+      } catch (err) {
+        // Only a real "not signed in" ends the session. Offline / server
+        // down keeps the saved user, so the installed app doesn't log
+        // people out every time the network drops.
+        if (err?.response?.status === 401) clearSession();
       } finally {
         setLoading(false);
       }

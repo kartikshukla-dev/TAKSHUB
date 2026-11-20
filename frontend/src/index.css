@@ -5986,6 +5986,43 @@ body {
   height: 34px;
 }
 
+.comment-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 2px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.comment-badge-new {
+  position: relative;
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.comment-new-tag {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 2px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.comment-new {
+  border-left: 2px solid var(--primary);
+  padding-left: 8px;
+}
+
 .subtask-badge {
   display: inline-flex;
   align-items: center;

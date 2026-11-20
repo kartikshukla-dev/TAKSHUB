@@ -7,6 +7,11 @@ import { SocketProvider } from './context/SocketContext.jsx';
 import { EffectsProvider } from './context/EffectsContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import './index.css';
+import { registerServiceWorker } from './utils/pwa';
+
+// Installable app + offline shell. Production only, so local dev never
+// serves stale files from a cache.
+if (import.meta.env.PROD) registerServiceWorker();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

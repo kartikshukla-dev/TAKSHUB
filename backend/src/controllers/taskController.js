@@ -255,14 +255,25 @@ const listTasks = catchAsync(async (req, res) => {
 
 const getTask = catchAsync(async (req, res) => {
   const project = await loadProject(req.params.projectId);
-  await loadTask(req, project);
+  const found = await loadTask(req, project);
+  // Opening a task marks its comments as seen. The previous time comes back
+  // as `commentsSeenAt` so the modal can tag the comments that are new.
+  const previous = (found.commentReads || []).find((r) => sameId(r.user, req.user._id));
+  await markCommentsSeen(found._id, req.user._id);
   const task = await Task.findById(req.params.id).populate([
     ...TASK_POPULATE,
     { path: 'comments.author', select: USER_FIELDS },
     { path: 'activityLog.changedBy', select: USER_FIELDS },
   ]);
-  res.status(200).json({ task });
+  res.status(200).json({ task, commentsSeenAt: previous ? previous.at : null });
 });
+
+// Records that `userId` has seen every comment on the task up to now.
+// Doesn't touch updatedAt, so lists sorted by "last updated" don't jump.
+async function markCommentsSeen(taskId, userId, at = new Date()) {
+  await Task.updateOne({ _id: taskId }, { $pull: { commentReads: { user: userId } } }, { timestamps: false });
+  await Task.updateOne({ _id: taskId }, { $push: { commentReads: { user: userId, at } } }, { timestamps: false });
+}
 
 // Human-readable "from -> to" for the update email.
 async function describeChanges(entries) {
@@ -471,6 +482,17 @@ const deleteTask = catchAsync(async (req, res) => {
   res.status(204).send();
 });
 
+// POST /api/projects/:projectId/tasks/:id/seen : sent when the task modal
+// closes, so comments that arrived while it was open count as seen too.
+const markTaskSeen = catchAsync(async (req, res) => {
+  const project = await loadProject(req.params.projectId);
+  const task = await loadTask(req, project);
+  const at = new Date();
+  await markCommentsSeen(task._id, req.user._id, at);
+  req.audit = { skip: true }; // a read receipt, not a change
+  res.status(200).json({ commentReads: [...(task.commentReads || []).filter((r) => !sameId(r.user, req.user._id)), { user: req.user._id, at }] });
+});
+
 const addComment = catchAsync(async (req, res) => {
   const { text } = req.body;
   if (!text || !String(text).trim()) throw new ApiError(400, 'text is required');
@@ -480,6 +502,8 @@ const addComment = catchAsync(async (req, res) => {
 
   task.comments.push({ author: req.user._id, text });
   task.activityLog.push({ field: 'comment', oldValue: null, newValue: text, changedBy: req.user._id, changedAt: new Date() });
+  // The writer has obviously seen their own comment.
+  task.commentReads = [...(task.commentReads || []).filter((r) => !sameId(r.user, req.user._id)), { user: req.user._id, at: new Date() }];
   await task.save();
 
   const populated = await task.populate([
@@ -703,6 +727,7 @@ module.exports = {
   updateTask,
   deleteTask,
   addComment,
+  markTaskSeen,
   uploadAttachment,
   downloadAttachment,
 };
