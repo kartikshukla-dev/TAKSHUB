@@ -1,1 +1,0 @@
-import{r,Y as t,b8 as a}from"./index-nyzxRmkL.js";function m(u,c=250){const n=r.useRef(u);n.current=u;const s=r.useRef(null),e=()=>{clearTimeout(s.current),s.current=setTimeout(()=>n.current(),c)};t("task:created",e),t("task:updated",e),t("task:deleted",e),t("task:commented",e),r.useEffect(()=>{const o=a(e);return()=>{o(),clearTimeout(s.current)}},[])}export{m as u};
