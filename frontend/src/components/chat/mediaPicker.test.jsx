@@ -45,7 +45,12 @@ describe('MediaPicker', () => {
     expect(JSON.parse(localStorage.getItem('oncare_recent_emoji'))).toEqual(['🍕']);
   });
 
-  it('shows office stickers, empty recent, searches them and hides GIFs without a key', async () => {
+  it('shows office stickers, empty recent, searches them, and GIFs credit the provider that answered', async () => {
+    vi.mocked(ws.searchGiphy).mockResolvedValue({
+      items: [{ type: 'gif', source: 'klipy', ref: 'k1', title: 'Party', url: 'https://static.klipy.com/a.gif' }],
+      next: 'klipy:2',
+      label: 'KLIPY',
+    });
     const onMedia = vi.fn();
     render(<MediaPicker onEmoji={vi.fn()} onMedia={onMedia} onClose={vi.fn()} />);
     fireEvent.click(screen.getByRole('tab', { name: 'Stickers' }));
@@ -56,8 +61,14 @@ describe('MediaPicker', () => {
     expect(onMedia).toHaveBeenCalledWith(expect.objectContaining({ type: 'sticker', source: 'office', ref: 'coffee' }));
 
     fireEvent.click(screen.getByRole('tab', { name: 'GIFs' }));
-    expect(screen.getByText(/GIF search isn’t switched on/)).toBeTruthy();
-    expect(ws.searchGiphy).not.toHaveBeenCalled();
+    expect(await screen.findByText('Powered by KLIPY')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Party' }));
+    expect(onMedia).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'gif', source: 'klipy' }));
+    // Trending once; reopening the tab is served from the session cache.
+    fireEvent.click(screen.getByRole('tab', { name: 'Emoji' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'GIFs' }));
+    await screen.findByText('Powered by KLIPY');
+    expect(ws.searchGiphy).toHaveBeenCalledTimes(1);
   });
 });
 

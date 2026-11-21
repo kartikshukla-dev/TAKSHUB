@@ -85,8 +85,10 @@ export const toggleSavedSticker = (sticker, on) =>
 export const clearRecentStickers = () => apiClient.delete('/chat/stickers/recent');
 // path is relative to the API, e.g. /chat/stickers/<id>/image
 export const fetchApiBlob = (path) => apiClient.get(path, { responseType: 'blob' }).then((r) => r.data);
-export const searchGiphy = (kind, q, offset = 0) =>
-  apiClient.get(`/chat/giphy/${kind}`, { params: { q, offset } }).then((r) => r.data);
+// GIF / sticker search (server tries GIPHY, KLIPY, Openverse, Imgflip in turn).
+// `cursor` comes from the previous answer's `next` for "Load more".
+export const searchGiphy = (kind, q, cursor = null) =>
+  apiClient.get(`/chat/giphy/${kind}`, { params: cursor ? { q, cursor } : { q } }).then((r) => r.data);
 export const markConversationRead = (id) => apiClient.post(`/chat/conversations/${id}/read`);
 
 export const listNotifications = () => apiClient.get('/notifications').then((r) => r.data);

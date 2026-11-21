@@ -52,9 +52,21 @@ describe('stickers', () => {
     expect(res.body.office[0]).toMatchObject({ source: 'office', ref: 'done' });
     expect(res.body.recent).toEqual([]);
     expect(res.body.saved).toEqual([]);
-    expect(res.body.giphy).toBe(false);
-    const g = await request(app).get('/api/chat/giphy/gifs?q=cat').set(auth(a));
-    expect(g.body).toMatchObject({ enabled: false, items: [] });
+    // GIF search is always on now: with no keys it falls back to Imgflip / Openverse.
+    expect(res.body.giphy).toBe(true);
+    const realFetch = global.fetch;
+    global.fetch = jest.fn(async (url) => ({
+      ok: url.includes('imgflip'),
+      status: url.includes('imgflip') ? 200 : 503,
+      json: async () => ({ success: true, data: { memes: [{ id: '9', name: 'Cat meme', url: 'https://i.imgflip.com/cat.jpg', width: 500, height: 500 }] } }),
+    }));
+    try {
+      const g = await request(app).get('/api/chat/giphy/gifs?q=cat').set(auth(a));
+      expect(g.body).toMatchObject({ enabled: true, provider: 'imgflip' });
+      expect(g.body.items[0].url).toBe('https://i.imgflip.com/cat.jpg');
+    } finally {
+      global.fetch = realFetch;
+    }
   });
 
   it('sends an office sticker without text and records it as recent', async () => {

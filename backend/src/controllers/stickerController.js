@@ -6,13 +6,13 @@ const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const gridfs = require('../services/gridfsService');
 const { OFFICE_STICKERS, OFFICE_KEYS } = require('../constants/officeStickers');
+const gifs = require('../services/gifService');
 
 const SAVED_MAX = 100;
 const RECENT_MAX = 30;
 const STICKER_MAX_BYTES = 1024 * 1024;
 // SVG is not allowed: it can carry scripts.
 const STICKER_TYPES = /^image\/(png|jpe?g|gif|webp)$/i;
-const GIPHY_HOST = /^(media\d*|i)\.giphy\.com$/i;
 
 const idStr = (v) => (v ? String(v._id || v) : null);
 const validId = (id) => mongoose.Types.ObjectId.isValid(String(id || ''));
@@ -58,15 +58,6 @@ async function canUseCustom(user, sticker) {
   );
 }
 
-function isGiphyUrl(url) {
-  try {
-    const u = new URL(String(url));
-    return u.protocol === 'https:' && GIPHY_HOST.test(u.hostname);
-  } catch {
-    return false;
-  }
-}
-
 // Checks a sticker / GIF coming from the client and returns the clean value
 // stored on the message (or in Saved / Recent). Throws ApiError when invalid.
 async function resolveMedia(user, input) {
@@ -87,8 +78,9 @@ async function resolveMedia(user, input) {
     if (!(await canUseCustom(user, sticker))) throw new ApiError(404, 'Sticker not found');
     return { type, source, ref, url: customUrl(sticker._id), title: sticker.name, width: null, height: null };
   }
-  if (source === 'giphy') {
-    if (!isGiphyUrl(input.url)) throw new ApiError(400, 'Invalid GIF');
+  if (gifs.SOURCES.includes(source)) {
+    // Only image hosts of that provider, so a message can't point anywhere else.
+    if (!gifs.hostOk(source, input.url)) throw new ApiError(400, 'Invalid GIF');
     const num = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.min(Math.round(Number(v)), 2000) : null);
     return {
       type,
@@ -125,7 +117,8 @@ const listStickers = catchAsync(async (req, res) => {
     mine: [...globals.filter((s) => idStr(s.owner) === idStr(req.user._id)), ...mine].map((s) => presentCustom(s, req.user)),
     saved: (req.user.savedStickers || []).map(refOf),
     recent: (req.user.recentStickers || []).map(refOf),
-    giphy: Boolean(process.env.GIPHY_API_KEY),
+    // GIF search always works now (Openverse / Imgflip need no key).
+    giphy: true,
   });
 });
 
@@ -215,47 +208,18 @@ const clearRecent = catchAsync(async (req, res) => {
   res.status(200).json({ recent: [] });
 });
 
-// GET /api/chat/giphy/:kind?q=&offset= (kind = gifs | stickers)
-// Proxied so the GIPHY key stays on the server.
+// GET /api/chat/giphy/:kind?q=&cursor= (kind = gifs | stickers)
+// Proxied (keys stay on the server) through several providers with a
+// shared cache; see services/gifService.js. Path kept for old clients.
 const giphySearch = catchAsync(async (req, res) => {
-  const key = process.env.GIPHY_API_KEY;
-  if (!key) return res.status(200).json({ enabled: false, items: [], next: null });
-  const kind = req.params.kind === 'stickers' ? 'stickers' : 'gifs';
-  const q = String(req.query.q || '').trim().slice(0, 50);
-  const offset = Math.max(0, Math.min(Number(req.query.offset) || 0, 4999));
-  const limit = 24;
-  const params = new URLSearchParams({ api_key: key, limit: String(limit), offset: String(offset), rating: 'g', bundle: 'messaging_non_clips' });
-  if (q) params.set('q', q);
-  const url = `https://api.giphy.com/v1/${kind}/${q ? 'search' : 'trending'}?${params}`;
-
-  let body;
-  try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!r.ok) throw new Error(`GIPHY ${r.status}`);
-    body = await r.json();
-  } catch (err) {
-    throw new ApiError(502, 'GIF search is not available right now');
-  }
-  const items = (body.data || [])
-    .map((g) => {
-      const full = (g.images && (g.images.fixed_height || g.images.original)) || {};
-      const small = (g.images && (g.images.fixed_height_small || g.images.fixed_width_small)) || full;
-      if (!isGiphyUrl(full.url)) return null;
-      return {
-        type: kind === 'stickers' ? 'sticker' : 'gif',
-        source: 'giphy',
-        ref: String(g.id),
-        title: String(g.title || '').slice(0, 200),
-        url: full.url,
-        preview: isGiphyUrl(small.url) ? small.url : full.url,
-        width: Number(full.width) || null,
-        height: Number(full.height) || null,
-      };
-    })
-    .filter(Boolean);
-  const total = body.pagination ? body.pagination.total_count : 0;
-  const nextOffset = offset + items.length;
-  return res.status(200).json({ enabled: true, items, next: items.length && nextOffset < total ? nextOffset : null });
+  const result = await gifs.search({
+    kind: req.params.kind,
+    q: req.query.q,
+    cursor: req.query.cursor || null,
+    user: String(req.user._id),
+  });
+  req.audit = { skip: true };
+  return res.status(200).json({ enabled: true, ...result });
 });
 
 module.exports = {

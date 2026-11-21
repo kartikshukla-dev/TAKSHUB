@@ -13,6 +13,20 @@ import { markReleaseSeen } from '../utils/whatsNew';
 // lead, points[], control? (JSX shown under the lead), action? { label, to }.
 const FEATURES = [
   {
+    id: 'gif-fallback',
+    title: 'GIF search that keeps working',
+    summary: 'More GIF sources, so it doesn’t run out.',
+    image: '/whats-new/gif-search.webp',
+    alt: 'GIF search in chat',
+    lead: 'GIF search now uses more than one GIF library and remembers recent searches.',
+    points: [
+      'If one library hits its free limit, the next one answers. The picker shows which one at the bottom.',
+      'Searches are saved for a few hours, so the same search by anyone in the office is instant.',
+      'If every GIF library is resting, you still get popular meme templates until they come back.',
+    ],
+    action: { label: 'Open chat', to: '/chat' },
+  },
+  {
     id: 'not-approved-reason',
     title: 'Not approved, with a reason',
     summary: 'Team Heads now say what needs to change.',
