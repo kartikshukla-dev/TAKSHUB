@@ -234,20 +234,38 @@ function EmojiTab({ query, onPick }) {
   );
 }
 
-// ---------- GIPHY (GIFs and animated stickers) ----------
+// ---------- GIFs and animated stickers (GIPHY / KLIPY / Openverse / Imgflip) ----------
 
-function useGiphy(kind, query, enabled) {
-  const [state, setState] = useState({ items: [], next: null, loading: false, error: '' });
-  const q = query.trim();
+// Same search in the same session doesn't go to the server again.
+const searchCache = new Map(); // `${kind}|${q}|${cursor}` -> answer
+const SEARCH_CACHE_MAX = 60;
+function searchGifs(kind, q, cursor = null) {
+  const key = `${kind}|${q.toLowerCase()}|${cursor || ''}`;
+  if (searchCache.has(key)) return searchCache.get(key);
+  const p = ws.searchGiphy(kind, q, cursor).catch((err) => {
+    searchCache.delete(key);
+    throw err;
+  });
+  searchCache.set(key, p);
+  if (searchCache.size > SEARCH_CACHE_MAX) searchCache.delete(searchCache.keys().next().value);
+  return p;
+}
+
+function useGifSearch(kind, query, enabled) {
+  const [state, setState] = useState({ items: [], next: null, label: null, loading: false, error: '' });
+  // One letter isn't a search yet: keep showing trending.
+  const typed = query.trim();
+  const q = typed.length >= 2 ? typed : '';
   useEffect(() => {
     if (!enabled) return undefined;
     let live = true;
     setState((s) => ({ ...s, loading: true, error: '' }));
+    // Wait until typing pauses, so "thank you" is one search, not eight.
     const t = setTimeout(() => {
-      ws.searchGiphy(kind, q, 0)
-        .then((r) => live && setState({ items: r.items || [], next: r.next, loading: false, error: '' }))
-        .catch((err) => live && setState({ items: [], next: null, loading: false, error: err.response?.data?.message || 'GIF search failed' }));
-    }, q ? 350 : 0);
+      searchGifs(kind, q)
+        .then((r) => live && setState({ items: r.items || [], next: r.next, label: r.label, limited: Boolean(r.limited), loading: false, error: '' }))
+        .catch((err) => live && setState({ items: [], next: null, label: null, loading: false, error: err.response?.data?.message || 'GIF search failed' }));
+    }, q ? 600 : 0);
     return () => {
       live = false;
       clearTimeout(t);
@@ -255,19 +273,24 @@ function useGiphy(kind, query, enabled) {
   }, [kind, q, enabled]);
 
   const more = () => {
-    if (state.next == null || state.loading) return;
+    if (!state.next || state.loading) return;
     setState((s) => ({ ...s, loading: true }));
-    ws.searchGiphy(kind, q, state.next)
-      .then((r) => setState((s) => ({ items: [...s.items, ...(r.items || [])], next: r.next, loading: false, error: '' })))
+    searchGifs(kind, q, state.next)
+      .then((r) => setState((s) => ({ items: [...s.items, ...(r.items || [])], next: r.next, label: s.label || r.label, loading: false, error: '' })))
       .catch(() => setState((s) => ({ ...s, loading: false })));
   };
   return { ...state, more };
 }
 
 function GiphyGrid({ kind, query, enabled, onPick }) {
-  const { items, next, loading, error, more } = useGiphy(kind, query, enabled);
+  const { items, next, label, limited, loading, error, more } = useGifSearch(kind, query, enabled);
   return (
     <>
+      {limited && kind === 'gifs' && (
+        <p className="media-hint gif-limited">
+          GIF search is resting (its free hourly limit is used up). Showing popular meme templates for now; GIFs come back on their own.
+        </p>
+      )}
       {error && <p className="media-empty">{error}</p>}
       {!error && !loading && items.length === 0 && <p className="media-empty">Nothing found.</p>}
       <div className={kind === 'gifs' ? 'gif-grid' : 'sticker-grid'}>
@@ -278,25 +301,17 @@ function GiphyGrid({ kind, query, enabled, onPick }) {
         ))}
       </div>
       {loading && <p className="media-empty">Loading…</p>}
-      {!loading && next != null && (
+      {!loading && next && (
         <button type="button" className="btn btn-secondary btn-sm media-more" onClick={more}>
           Load more
         </button>
       )}
-      <p className="giphy-credit">Powered by GIPHY</p>
+      {label && <p className="giphy-credit">Powered by {label}</p>}
     </>
   );
 }
 
-function GifTab({ query, giphy, onPick }) {
-  if (giphy === undefined) return <p className="media-empty">Loading…</p>;
-  if (!giphy) {
-    return (
-      <p className="media-empty">
-        GIF search isn’t switched on yet. Ask your admin to add a free GIPHY API key on the server.
-      </p>
-    );
-  }
+function GifTab({ query, onPick }) {
   return (
     <div className="media-scroll">
       <GiphyGrid kind="gifs" query={query} enabled onPick={onPick} />
@@ -464,9 +479,9 @@ function StickerTab({ query, data, error, onPick }) {
         )}
       </section>
 
-      {q && data.giphy && (
+      {q.length >= 2 && (
         <section>
-          <h4 className="media-heading">From GIPHY</h4>
+          <h4 className="media-heading">Animated stickers</h4>
           <GiphyGrid kind="stickers" query={query} enabled onPick={onPick} />
         </section>
       )}
@@ -550,7 +565,7 @@ export default function MediaPicker({ onEmoji, onMedia, onClose, align = 'left' 
       </div>
       <div className="media-body">
         {tab === 'emoji' && <EmojiTab query={query} onPick={onEmoji} />}
-        {tab === 'gif' && <GifTab query={query} giphy={data ? data.giphy : error ? false : undefined} onPick={pickMedia} />}
+        {tab === 'gif' && <GifTab query={query} onPick={pickMedia} />}
         {tab === 'sticker' && <StickerTab query={query} data={data} error={error} onPick={pickMedia} />}
       </div>
     </div>

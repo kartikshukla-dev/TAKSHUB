@@ -13,7 +13,7 @@ const STATUSES = ['invited', 'active', 'disabled'];
 
 const stickerRefSchema = new mongoose.Schema(
   {
-    source: { type: String, enum: ['giphy', 'office', 'custom'], required: true },
+    source: { type: String, enum: ['giphy', 'klipy', 'openverse', 'imgflip', 'office', 'custom'], required: true },
     ref: { type: String, required: true },
     url: { type: String, required: true },
     title: { type: String, default: '' },
