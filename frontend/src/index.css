@@ -1209,6 +1209,94 @@ a.cell-person:hover {
   width: auto;
   min-width: 140px;
 }
+.na-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.na-menu-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+.na-menu-btn-on .na-menu-count {
+  background: var(--status-not-approved);
+  color: #fff;
+}
+.na-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  width: min(360px, 90vw);
+  padding: 8px;
+}
+.na-menu-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 2px 6px 8px;
+}
+.na-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 360px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.na-menu-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--status-not-approved);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.na-menu-item:hover {
+  background: var(--muted);
+}
+.na-menu-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.na-menu-who {
+  margin-left: auto;
+}
+.na-menu-title {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.na-menu-reason {
+  color: var(--status-not-approved);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.na-menu-empty {
+  margin: 4px 6px 8px;
+}
+.na-menu-foot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 8px 6px 2px;
+}
 .not-approved-box {
   display: flex;
   flex-direction: column;
@@ -2254,7 +2342,7 @@ a.bar-row:hover .cell-person {
 
 .board {
   display: grid;
-  grid-template-columns: repeat(5, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, minmax(240px, 1fr));
   gap: 12px;
   overflow-x: auto;
   padding-bottom: 8px;

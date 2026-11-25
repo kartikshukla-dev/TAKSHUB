@@ -21,9 +21,10 @@ describe("What's new", () => {
     const onClose = vi.fn();
     renderIt(onClose);
     expect(hasSeenRelease()).toBe(true);
-    expect(screen.getByRole('heading', { name: 'GIF search that keeps working' })).toBeTruthy();
-    expect(screen.getByText('1 of 8')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Roomier board' })).toBeTruthy();
+    expect(screen.getByText('1 of 9')).toBeTruthy();
     [
+      'GIF search that keeps working',
       'Not approved, with a reason',
       'Deadline reminders',
       'Notifications even when the app is closed',

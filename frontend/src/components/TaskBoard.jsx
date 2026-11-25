@@ -6,7 +6,10 @@ import { onTaskChange, emitTaskChange } from '../utils/taskEvents';
 import { STATUSES, NOT_APPROVED, projectIdOf } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
 import Column from './Column';
-import NotApprovedDialog from './NotApprovedDialog';
+
+// Not approved tasks are few, so they get a button above the board
+// (NotApprovedMenu) instead of a fifth column that squeezes the cards.
+export const BOARD_COLUMNS = STATUSES.filter((s) => s.id !== NOT_APPROVED);
 
 // Kanban view over an already-filtered task list. Owns the optimistic
 // drag-to-move and the drop-to-done animation; `setTasks` comes from the
@@ -14,12 +17,11 @@ import NotApprovedDialog from './NotApprovedDialog';
 export default function TaskBoard({ tasks, setTasks, onOpenTask, onError }) {
   const [justCompleted, setJustCompleted] = useState(null);
   const { canApproveTask } = useAuth();
-  const [askReason, setAskReason] = useState(null); // task waiting for a "not approved" reason
   // A small drag threshold keeps plain clicks opening the task.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const tasksByStatus = useMemo(() => {
-    const grouped = Object.fromEntries(STATUSES.map((s) => [s.id, []]));
+    const grouped = Object.fromEntries(BOARD_COLUMNS.map((s) => [s.id, []]));
     tasks.forEach((t) => grouped[t.status]?.push(t));
     return grouped;
   }, [tasks]);
@@ -43,21 +45,8 @@ export default function TaskBoard({ tasks, setTasks, onOpenTask, onError }) {
     const newStatus = over.id;
     const task = tasks.find((t) => t._id === taskId);
     if (!task || task.status === newStatus) return;
-    if (newStatus === NOT_APPROVED && canApproveTask(task)) {
-      setAskReason(task); // moved once the head gives a reason
-      return;
-    }
-    await moveTask(task, newStatus);
-  };
-
-  const moveTask = async (task, newStatus, extra = {}) => {
-    const taskId = task._id;
-    if ((newStatus === NOT_APPROVED || task.status === NOT_APPROVED) && !canApproveTask(task)) {
-      onError?.(
-        task.status === NOT_APPROVED
-          ? 'This task is Not approved. Only the team head can move it.'
-          : 'Only the team head can mark a task as Not approved'
-      );
+    if (task.status === NOT_APPROVED && !canApproveTask(task)) {
+      onError?.('This task is Not approved. Only the team head can move it.');
       return;
     }
 
@@ -66,7 +55,7 @@ export default function TaskBoard({ tasks, setTasks, onOpenTask, onError }) {
     // Optimistic update; the server response is the source of truth.
     setTasks((prev) => prev.map((t) => (t._id === taskId ? { ...t, status: newStatus } : t)));
     try {
-      const updated = await tasksApi.updateTask(projectIdOf(task), taskId, { status: newStatus, ...extra });
+      const updated = await tasksApi.updateTask(projectIdOf(task), taskId, { status: newStatus });
       setTasks((prev) => prev.map((t) => (t._id === taskId ? { ...t, ...updated } : t)));
       emitTaskChange(updated, 'moved');
     } catch (err) {
@@ -82,7 +71,7 @@ export default function TaskBoard({ tasks, setTasks, onOpenTask, onError }) {
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="board">
-        {STATUSES.map((col) => (
+        {BOARD_COLUMNS.map((col) => (
           <Column
             key={col.id}
             id={col.id}
@@ -94,18 +83,6 @@ export default function TaskBoard({ tasks, setTasks, onOpenTask, onError }) {
           />
         ))}
       </div>
-      {askReason && (
-        <NotApprovedDialog
-          task={askReason}
-          onCancel={() => setAskReason(null)}
-          onConfirm={async (reason) => {
-            const task = askReason;
-            setAskReason(null);
-            await moveTask(task, NOT_APPROVED, { notApprovedReason: reason });
-            return null;
-          }}
-        />
-      )}
     </DndContext>
   );
 }
