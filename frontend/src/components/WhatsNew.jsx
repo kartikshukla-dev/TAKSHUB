@@ -13,6 +13,20 @@ import { markReleaseSeen } from '../utils/whatsNew';
 // lead, points[], control? (JSX shown under the lead), action? { label, to }.
 const FEATURES = [
   {
+    id: 'not-approved-button',
+    title: 'Roomier board',
+    summary: 'Not approved moved to a button above the board.',
+    image: '/whats-new/not-approved-button.webp',
+    alt: 'Not approved button above the board',
+    lead: 'The board is back to four columns, so cards have more room.',
+    points: [
+      'Not approved tasks are now behind the “Not approved” button above the board. The number shows how many there are.',
+      'Click it to see each task with the team head’s reason, then click a task to open it.',
+      'Team Heads still mark a task Not approved from the task’s Status, with a reason.',
+    ],
+    action: { label: 'Open my tasks', to: '/my-tasks' },
+  },
+  {
     id: 'gif-fallback',
     title: 'GIF search that keeps working',
     summary: 'More GIF sources, so it doesn’t run out.',

@@ -1,6 +1,6 @@
 // Bump RELEASE whenever the What's new list changes: everyone sees the
 // modal open by itself once more.
-export const RELEASE = '2026-11-gif-fallback';
+export const RELEASE = '2026-11-not-approved-button';
 const SEEN_KEY = 'oncare_whats_new_seen';
 
 export function hasSeenRelease() {

@@ -8,6 +8,7 @@ import { useTaskUi } from '../context/TaskUiContext';
 import FilterBar, { EMPTY_FILTERS } from './FilterBar';
 import TaskTable from './TaskTable';
 import TaskBoard from './TaskBoard';
+import NotApprovedMenu from './NotApprovedMenu';
 import Icon from './Icon';
 import { EmptyState } from './ui';
 
@@ -196,6 +197,7 @@ export default function TaskView({
           >
             <Icon name="sort" size={15} className={dir === 'asc' ? 'flip-y' : ''} />
           </button>
+          {view === 'board' && <NotApprovedMenu tasks={tasks} onOpenTask={openTask} />}
           <div className="segmented">
             <button type="button" className={view === 'list' ? 'active' : ''} onClick={() => changeView('list')}>
               <Icon name="list" size={14} /> List
